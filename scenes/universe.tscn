@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://cplmw0ov0h5jw"]
+
+[ext_resource type="Shader" uid="uid://dgqbbg4eimo4r" path="res://shaders/lightweight_crt.gdshader" id="1_h4s8v"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_m7uww"]
+shader = ExtResource("1_h4s8v")
+shader_parameter/resolution = Vector2(320, 180)
+shader_parameter/scan_line_amount = 0.5
+shader_parameter/warp_amount = 0.05
+shader_parameter/vignette_amount = 0.5
+shader_parameter/grille_amount = 0.05
+shader_parameter/brightness_boost = 1.2
+
+[node name="Universe" type="Node2D" unique_id=1812180918]
+
+[node name="CurrentLevel" type="Node2D" parent="." unique_id=1878064036]
+
+[node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=581223513]
+visible = false
+
+[node name="Hud" type="CanvasLayer" parent="." unique_id=1215746268]
+visible = false
+
+[node name="Filters" type="CanvasLayer" parent="." unique_id=1374184742]
+visible = false
+
+[node name="LightweightCrt" type="ColorRect" parent="Filters" unique_id=1981363481]
+visible = false
+material = SubResource("ShaderMaterial_m7uww")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2

@@ -1,0 +1,44 @@
+[gd_resource type="SpriteFrames" format=3 uid="uid://ogqaktycfdjc"]
+
+[resource]
+animations = [{
+"frames": [],
+"loop": 1,
+"name": &"attack",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"climb",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"duck",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"front",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"hit",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"jump",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"walk",
+"speed": 5.0
+}]

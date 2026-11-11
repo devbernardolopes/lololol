@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://ba102dsbhnr7y"]
+
+[ext_resource type="Script" uid="uid://c7fm6m12fwcih" path="res://scripts/entity.gd" id="1_nl5x1"]
+[ext_resource type="Resource" uid="uid://clc6stjf8ff77" path="res://resources/entities/characters/beige.tres" id="2_4gi7c"]
+
+[node name="Beige" type="CharacterBody2D" unique_id=1720267616]
+script = ExtResource("1_nl5x1")
+playable = true
+data = ExtResource("2_4gi7c")
+metadata/_custom_type_script = "uid://c4odocttuy1wr"

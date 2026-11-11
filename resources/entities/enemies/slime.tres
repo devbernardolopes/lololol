@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="EntityData" format=3 uid="uid://dfrcbvjg8cu14"]
+
+[ext_resource type="Script" uid="uid://dfksj5d8vpw2r" path="res://resources/entity_data.gd" id="1_mqvfc"]
+[ext_resource type="Texture2D" uid="uid://owk2kuuuhqqb" path="res://assets/images/entities/enemies/slime_normal_flat.png" id="2_ttfp1"]
+[ext_resource type="Texture2D" uid="uid://cxxjedvyqt02b" path="res://assets/images/entities/enemies/slime_normal_rest.png" id="3_ya7r5"]
+[ext_resource type="Texture2D" uid="uid://c433tqf16kmw2" path="res://assets/images/entities/enemies/slime_normal_walk_a.png" id="4_ufuu0"]
+[ext_resource type="Texture2D" uid="uid://hyvlmcpeihmi" path="res://assets/images/entities/enemies/slime_normal_walk_b.png" id="5_ua04l"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_vvm0d"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_ttfp1")
+}],
+"loop": 1,
+"name": &"hit",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_ya7r5")
+}],
+"loop": 1,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("4_ufuu0")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_ua04l")
+}],
+"loop": 1,
+"name": &"walk",
+"speed": 5.0
+}]
+
+[resource]
+script = ExtResource("1_mqvfc")
+visual = SubResource("SpriteFrames_vvm0d")
+metadata/_custom_type_script = "uid://dfksj5d8vpw2r"

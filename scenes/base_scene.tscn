@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://r6gsj6g4jr0u"]
+
+[ext_resource type="Script" uid="uid://c4odocttuy1wr" path="res://scripts/base_scene.gd" id="1_ou4n4"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_ou4n4"]
+radius = 32.0
+height = 124.0
+
+[sub_resource type="OccluderPolygon2D" id="OccluderPolygon2D_ou4n4"]
+cull_mode = 2
+polygon = PackedVector2Array(-32, -32, 32, -32, 32, 32, -32, 32)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_gf1bn"]
+
+[node name="BaseScene" type="CharacterBody2D" unique_id=1614855315]
+script = ExtResource("1_ou4n4")
+
+[node name="Collision" type="CollisionShape2D" parent="." unique_id=1284167888]
+shape = SubResource("CapsuleShape2D_ou4n4")
+
+[node name="Occluder" type="LightOccluder2D" parent="." unique_id=638464797]
+occluder = SubResource("OccluderPolygon2D_ou4n4")
+
+[node name="Visual" type="AnimatedSprite2D" parent="." unique_id=739967821]
+sprite_frames = SubResource("SpriteFrames_gf1bn")
