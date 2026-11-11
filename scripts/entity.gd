@@ -103,6 +103,9 @@ func _physics_process(delta: float) -> void:
 	else:
 		state = State.AIRBORNE
 
+	if visual and direction.x != 0.0:
+		visual.flip_h = direction.x < 0.0
+
 	_play_state_animation()
 
 

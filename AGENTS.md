@@ -23,6 +23,7 @@ The testing device is:
 - Editor-log ghosts: the log buffer re-emits stale diagnostics on scans — confirm errors against current file contents (grep) before treating them as live.
 - Never reference `EditorInterface` directly from a script that is shipped in a game: editor classes are stripped from export templates and the script then fails to load. Access it only under `Engine.is_editor_hint()` through `Engine.get_singleton(&"EditorInterface")`.
 - Godot generates `.gd.uid` sidecars; keep them tracked so scenes and references stay stable.
+- Avoid local variables or parameters that shadow existing member variables (GDScript warns on shadowing). If a local/parameter name would collide with a member (e.g. a method parameter named `acceleration` when the class has `@export var acceleration`), rename the local/parameter with a `_` prefix (e.g. `_acceleration`).
 
 ## Commit Convention
 
