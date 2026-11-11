@@ -1,6 +1,6 @@
 [gd_scene format=4 uid="uid://cpmd8w0buj0ji"]
 
-[ext_resource type="TileSet" uid="uid://c04ld3mv2rl0m" path="res://resources/terrain_tile_set.tres" id="1_urcjx"]
+[ext_resource type="TileSet" uid="uid://c04ld3mv2rl0m" path="res://resources/tilesets/terrain_tile_set.tres" id="1_urcjx"]
 [ext_resource type="PackedScene" uid="uid://dqaq56m04nbh2" path="res://scenes/entities/enemies/slime.tscn" id="2_o3u5i"]
 [ext_resource type="PackedScene" uid="uid://ba102dsbhnr7y" path="res://scenes/entities/characters/beige.tscn" id="3_4j58l"]
 [ext_resource type="Script" uid="uid://du20g02umhrdf" path="res://scripts/player_controller.gd" id="4_n1788"]
@@ -17,9 +17,13 @@ tile_set = ExtResource("1_urcjx")
 
 [node name="Slime" parent="Entities" unique_id=1101442322 instance=ExtResource("2_o3u5i")]
 position = Vector2(1568, 2144)
+move_speed = null
+hit_points = null
 
 [node name="Beige" parent="Entities" unique_id=1720267616 instance=ExtResource("3_4j58l")]
 position = Vector2(608, 1792)
+move_speed = null
+hit_points = null
 
 [node name="PlayerController" type="Node" parent="Entities/Beige" unique_id=2119968243]
 script = ExtResource("4_n1788")

@@ -7,8 +7,6 @@ extends CharacterBody2D
 	set(v):
 		data = v
 		_refresh_visual()
-@export var move_speed: float = 400.0
-@export var hit_points: int = 1
 
 var visual: AnimatedSprite2D = null
 var collision: CollisionShape2D = null
@@ -20,7 +18,8 @@ func _ready() -> void:
 	if not visual:
 		visual = AnimatedSprite2D.new()
 		add_child(visual)
-	collision = Helper.find_control(self, "CollisionShape2D")
+	collision = Helper.find_control(self, "CollisionShape2D", &"Collision")
+	print(collision)
 	if not collision:
 		collision = CollisionShape2D.new()
 		collision.shape = CapsuleShape2D.new()

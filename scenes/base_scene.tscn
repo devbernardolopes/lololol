@@ -19,6 +19,7 @@ script = ExtResource("1_ou4n4")
 shape = SubResource("CapsuleShape2D_ou4n4")
 
 [node name="Occluder" type="LightOccluder2D" parent="." unique_id=638464797]
+show_behind_parent = true
 occluder = SubResource("OccluderPolygon2D_ou4n4")
 
 [node name="Visual" type="AnimatedSprite2D" parent="." unique_id=739967821]
