@@ -21,6 +21,7 @@ enum State {
 @export var jump_velocity: float = -400.0
 @export var coyote_time: float = 0.12
 @export var jump_buffer_time: float = 0.08
+@export_range(0.0, 1.0, 0.05) var slope_jump_assist: float = 0.25
 @export var hit_points: int = 1
 
 const ANIMATION_IDLE: StringName = &"idle"
@@ -82,7 +83,7 @@ func _physics_process(delta: float) -> void:
 	if playable and _jump_buffer_timer > 0.0 and _coyote_timer > 0.0:
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
-		velocity.y = jump_velocity + _slope_climb_speed()
+		_apply_jump()
 		state = State.AIRBORNE
 		_play_state_animation()
 	move_and_slide()
@@ -131,10 +132,16 @@ func _play_state_animation() -> void:
 			_play_animation(ANIMATION_JUMP, 1.0)
 
 
-## Vertical speed of the ground under the feet when climbing (negative = going up).
-func _slope_climb_speed() -> float:
+## Starts a jump. When jumping while climbing a slope, the horizontal speed is
+## matched to the real motion along the slope and a fraction of the slope's
+## rise speed is added, so the jump isn't swallowed by the ground rising with us.
+func _apply_jump() -> void:
+	velocity.y = jump_velocity
 	if not is_on_floor():
-		return 0.0
+		return
 	var normal: Vector2 = get_floor_normal()
-	var surface_vy: float = velocity.x * normal.x / -normal.y
-	return clampf(surface_vy, jump_velocity, 0.0)
+	if normal.x * velocity.x >= 0.0:
+		return # flat ground or descending
+	velocity.x *= absf(normal.y)
+	var slope_rise: float = velocity.x * normal.x / -normal.y # negative = going up
+	velocity.y += slope_jump_assist * slope_rise
