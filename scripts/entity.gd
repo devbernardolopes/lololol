@@ -10,6 +10,7 @@ enum State {
 	FLY,
 	HIT,
 	DUCK,
+	CLIMB,
 }
 
 enum Team {
@@ -44,6 +45,14 @@ enum Team {
 ## Downward fall speed used while dropping through terrain.
 @export var drop_through_speed: float = 450.0
 
+## When true, this entity may grab tiles marked with the "climbable" custom
+## data (ladders) by pressing "up" or "down" while overlapping them.
+@export var can_climb: bool = false
+## Vertical speed while climbing.
+@export var climb_speed: float = 200.0
+## Playback speed of the climb animation.
+@export var climb_animation_speed: float = 1.0
+
 @export var team: Team = Team.ENEMY
 @export var contact_damage: int = 0
 @export var stompable: bool = false
@@ -62,7 +71,12 @@ const ANIMATION_JUMP: StringName = &"jump"
 const ANIMATION_FLY: StringName = &"fly"
 const ANIMATION_HIT: StringName = &"hit"
 const ANIMATION_DUCK: StringName = &"duck"
+const ANIMATION_CLIMB: StringName = &"climb"
 const STOMP_GRACE_TIME: float = 0.25
+## Time during which a ladder cannot be grabbed again after leaving it.
+const CLIMB_GRAB_COOLDOWN: float = 0.25
+## Safety cap for the number of cells walked while looking for a ladder's end.
+const CLIMB_MAX_SEGMENT: int = 128
 ## How far below the collision shape one-way tiles are searched when a drop starts.
 const DROP_SEED_EXPANSION: float = 12.0
 ## Maximum distance between polygon vertices of two tiles for them to be connected.
@@ -110,6 +124,16 @@ var _drop_cells: Dictionary = {}
 var _drop_polygons: Array[Dictionary] = []
 var _drop_vertices: PackedVector2Array = PackedVector2Array()
 var _is_ducking: bool = false
+var _is_climbing: bool = false
+var _climb_jumped: bool = false
+var _climb_layer: TileMapLayer = null
+var _climb_column: int = 0
+var _climb_top: int = 0
+var _climb_bottom: int = 0
+var _climb_last_horizontal: float = 0.0
+var _climb_block_direction: int = 0
+var _climb_animation_direction: int = 0
+var _climb_cooldown_timer: float = 0.0
 var _base_collision_shape: Shape2D = null
 var _duck_collision_shape: Shape2D = null
 var _duck_collision_shape_position: Vector2 = Vector2.ZERO
@@ -172,6 +196,7 @@ func _physics_process(delta: float) -> void:
 			visual.modulate.a = 1.0
 	_hit_stun_timer = maxf(_hit_stun_timer - delta, 0.0)
 	_death_linger_timer = maxf(_death_linger_timer - delta, 0.0)
+	_climb_cooldown_timer = maxf(_climb_cooldown_timer - delta, 0.0)
 	if _death_linger_timer <= 0.0 and _is_dead and team != Team.PLAYER:
 		queue_free()
 	# --- Intents ---
@@ -179,7 +204,30 @@ func _physics_process(delta: float) -> void:
 	var intents_active: bool = controller != null and not _intents_blocked()
 	if intents_active:
 		direction = controller.get_move_intent()
-	var was_on_floor: bool = is_on_floor()
+	var up_held: bool = intents_active and controller != null and controller.is_up_held()
+	var down_held: bool = intents_active and controller != null and controller.is_down_held()
+	# Releasing the key that ended a climb clears its re-grab latch.
+	if _climb_block_direction < 0 and not up_held:
+		_climb_block_direction = 0
+	elif _climb_block_direction > 0 and not down_held:
+		_climb_block_direction = 0
+	# --- Climbing ---
+	var was_climbing: bool = _is_climbing
+	if _is_climbing:
+		_process_climbing(delta, direction, up_held, down_held)
+		if _climb_jumped:
+			_climb_jumped = false
+			_process_contacts()
+			_play_state_animation()
+			return
+		if _is_climbing:
+			_process_contacts()
+			if _is_climbing:
+				_play_state_animation()
+				return
+		# Climbing ended during this frame (left/right, ladder end or damage):
+		# fall through to the normal movement code.
+	var was_on_floor: bool = is_on_floor() and not was_climbing
 	var run_active: bool = controller != null and controller.is_run_held() and (was_on_floor or flying)
 	# Ducking only changes facing: horizontal input is ignored and any momentum
 	# decelerates to a stop. Use the intent instead of _is_ducking because the
@@ -255,9 +303,14 @@ func _physics_process(delta: float) -> void:
 	if _drop_through and not flying:
 		collision_mask = _base_collision_mask
 		_drop_moved = true
+	# --- Ladder grab ---
+	if not _is_climbing and not _is_dead:
+		_try_start_climb(up_held, down_held, direction.x)
 	# --- State transitions ---
 	if _hit_stun_timer > 0.0:
 		state = State.HIT
+	elif _is_climbing:
+		state = State.CLIMB
 	elif flying:
 		state = State.FLY if direction.x != 0.0 else State.IDLE
 	elif is_on_floor():
@@ -322,6 +375,243 @@ func _play_state_animation() -> void:
 			_play_animation(ANIMATION_FLY, 1.0)
 		State.HIT:
 			_play_animation(ANIMATION_HIT, 1.0)
+		State.CLIMB:
+			_play_animation(ANIMATION_CLIMB, 1.0)
+
+
+## Handles a frame while attached to a ladder. Movement is applied directly to
+## the body so one-way platforms do not interrupt the climb; leaving the climb
+## state is handled by the callers of this function.
+func _process_climbing(delta: float, direction: Vector2, up_held: bool, down_held: bool) -> void:
+	if _intents_blocked():
+		_stop_climbing()
+		return
+	if controller != null and controller.is_jump_just_pressed():
+		_stop_climbing()
+		_climb_jumped = true
+		_jump_buffer_timer = 0.0
+		_coyote_timer = 0.0
+		velocity = Vector2(0.0, jump_velocity)
+		state = State.AIRBORNE
+		move_and_slide()
+		return
+	# Horizontal input detaches, but only when it changes from the horizontal
+	# intent held while grabbing (so climbing while running does not jitter).
+	if direction.x != 0.0 and direction.x != _climb_last_horizontal:
+		var detach_direction: float = direction.x
+		_stop_climbing()
+		velocity.x = detach_direction * move_speed
+		return
+	_climb_last_horizontal = direction.x
+	_snap_to_climb_column()
+	var climb_direction: int = 0
+	if up_held:
+		climb_direction = -1
+	elif down_held:
+		climb_direction = 1
+	if climb_direction == 0:
+		velocity = Vector2.ZERO
+		_set_climb_animation(0)
+		return
+	var feet_before: float = get_body_rect().end.y
+	var feet_target: float = feet_before + float(climb_direction) * climb_speed * delta
+	# The topmost ladder cell is the cap above the landing surface, so climbing
+	# up stops at that cell's bottom edge (the surface the player steps onto).
+	var top_edge: float = _climb_edge_y(_climb_top, 1)
+	var bottom_edge: float = _climb_edge_y(_climb_bottom, 1)
+	var reached_end: bool = false
+	if climb_direction < 0 and feet_target <= top_edge:
+		feet_target = top_edge
+		reached_end = true
+	elif climb_direction > 0 and feet_target >= bottom_edge:
+		feet_target = bottom_edge
+		reached_end = true
+	global_position.y += feet_target - feet_before
+	velocity = Vector2.ZERO
+	_set_climb_animation(climb_direction)
+	if reached_end:
+		_stop_climbing(false)
+		_climb_block_direction = climb_direction
+
+
+## Tries to grab a ladder under the entity's feet. The top cap cannot be
+## grabbed while pressing up, and the bottom cap cannot be grabbed while
+## pressing down: there is no more ladder in that direction.
+func _try_start_climb(up_held: bool, down_held: bool, horizontal: float) -> void:
+	if not can_climb or flying or _drop_through or _climb_cooldown_timer > 0.0:
+		return
+	var want_up: bool = up_held and _climb_block_direction != -1
+	var want_down: bool = down_held and _climb_block_direction != 1
+	if not want_up and not want_down:
+		return
+	var found: Dictionary = _find_climbable_cell()
+	if found.is_empty():
+		return
+	var coords: Vector2i = found["coords"]
+	var top: int = found["top"]
+	var bottom: int = found["bottom"]
+	var going_up: bool = want_up
+	if going_up and coords.y <= top:
+		if want_down and coords.y < bottom:
+			going_up = false
+		else:
+			return
+	elif not going_up and coords.y >= bottom:
+		return
+	_start_climb(found, going_up, horizontal)
+
+
+func _start_climb(found: Dictionary, going_up: bool, horizontal: float) -> void:
+	var coords: Vector2i = found["coords"]
+	_is_climbing = true
+	_climb_jumped = false
+	_climb_layer = found["layer"] as TileMapLayer
+	_climb_column = coords.x
+	_climb_top = found["top"]
+	_climb_bottom = found["bottom"]
+	_climb_last_horizontal = horizontal
+	_climb_block_direction = 0
+	_climb_animation_direction = 0
+	_jump_buffer_timer = 0.0
+	_coyote_timer = 0.0
+	_set_ducking(false)
+	velocity = Vector2.ZERO
+	_snap_to_climb_column()
+	state = State.CLIMB
+	_play_state_animation()
+	_set_climb_animation(-1 if going_up else 1)
+
+
+## Leaves the climb state. A grab cooldown is applied unless the caller ended
+## the climb at the ladder's own end, where the directional latch is enough.
+func _stop_climbing(with_cooldown: bool = true) -> void:
+	if not _is_climbing:
+		return
+	_is_climbing = false
+	_climb_jumped = false
+	_climb_layer = null
+	_climb_column = 0
+	_climb_top = 0
+	_climb_bottom = 0
+	_climb_last_horizontal = 0.0
+	_climb_animation_direction = 0
+	if with_cooldown:
+		_climb_cooldown_timer = CLIMB_GRAB_COOLDOWN
+
+
+## Keeps the collision shape centred on the ladder column while climbing.
+func _snap_to_climb_column() -> void:
+	if _climb_layer == null or collision == null:
+		return
+	var center: Vector2 = _climb_layer.to_global(
+		_climb_layer.map_to_local(Vector2i(_climb_column, _climb_top))
+	)
+	global_position.x = center.x - collision.position.x
+
+
+## Global Y coordinate of the ladder segment's top (-1) or bottom (+1) edge.
+func _climb_edge_y(row: int, direction: int) -> float:
+	if _climb_layer == null:
+		return global_position.y
+	var half_height: float = 0.0
+	if _climb_layer.tile_set != null:
+		half_height = float(_climb_layer.tile_set.tile_size.y) * 0.5
+	var local_center: Vector2 = _climb_layer.map_to_local(Vector2i(_climb_column, row))
+	var local_edge: Vector2 = local_center + Vector2(0.0, half_height * float(direction))
+	return _climb_layer.to_global(local_edge).y
+
+
+## Plays the climb animation in the movement direction, or pauses it in place.
+func _set_climb_animation(climb_direction: int) -> void:
+	if climb_direction == _climb_animation_direction:
+		return
+	_climb_animation_direction = climb_direction
+	if visual == null or visual.sprite_frames == null:
+		return
+	if not visual.sprite_frames.has_animation(ANIMATION_CLIMB):
+		return
+	if climb_direction < 0:
+		visual.play(ANIMATION_CLIMB, climb_animation_speed)
+	elif climb_direction > 0:
+		visual.play(ANIMATION_CLIMB, -climb_animation_speed, true)
+	else:
+		visual.pause()
+
+
+## Finds the closest climbable cell overlapping the entity's feet.
+func _find_climbable_cell() -> Dictionary:
+	if collision == null:
+		return {}
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		scene = get_tree().root
+	var layers: Array[TileMapLayer] = []
+	_collect_tile_map_layers(scene, layers)
+	if layers.is_empty():
+		return {}
+	var body_rect: Rect2 = get_body_rect()
+	var best: Dictionary = {}
+	var best_distance: float = INF
+	for layer: TileMapLayer in layers:
+		var top_left: Vector2i = layer.local_to_map(layer.to_local(body_rect.position))
+		var bottom_right: Vector2i = layer.local_to_map(layer.to_local(body_rect.end))
+		for cell_y: int in range(top_left.y - 1, bottom_right.y + 2):
+			for cell_x: int in range(top_left.x - 1, bottom_right.x + 2):
+				var coords := Vector2i(cell_x, cell_y)
+				if not _is_climbable(layer, coords):
+					continue
+				var center: Vector2 = layer.to_global(layer.map_to_local(coords))
+				var tile_size: Vector2 = _get_layer_tile_size(layer)
+				var cell_rect := Rect2(center - tile_size * 0.5, tile_size)
+				if not cell_rect.intersects(body_rect):
+					continue
+				var distance: float = absf(center.x - body_rect.get_center().x)
+				if distance >= best_distance:
+					continue
+				var bounds: Vector2i = _climb_segment_bounds(layer, coords)
+				best_distance = distance
+				best = {
+					"layer": layer,
+					"coords": coords,
+					"top": bounds.x,
+					"bottom": bounds.y,
+				}
+	return best
+
+
+func _get_layer_tile_size(layer: TileMapLayer) -> Vector2:
+	if layer.tile_set == null:
+		return Vector2.ZERO
+	var size: Vector2i = layer.tile_set.tile_size
+	var _scale: Vector2 = layer.global_scale
+	return Vector2(float(size.x) * absf(_scale.x), float(size.y) * absf(_scale.y))
+
+
+## Walks the ladder column upwards and downwards from the touched cell and
+## returns the top and bottom rows of the contiguous climbable segment.
+func _climb_segment_bounds(layer: TileMapLayer, coords: Vector2i) -> Vector2i:
+	var top: int = coords.y
+	var steps: int = 0
+	while steps < CLIMB_MAX_SEGMENT and _is_climbable(layer, Vector2i(coords.x, top - 1)):
+		top -= 1
+		steps += 1
+	var bottom: int = coords.y
+	steps = 0
+	while steps < CLIMB_MAX_SEGMENT and _is_climbable(layer, Vector2i(coords.x, bottom + 1)):
+		bottom += 1
+		steps += 1
+	return Vector2i(top, bottom)
+
+
+## Whether the tile in a cell is marked as climbable in its tileset's
+## "climbable" custom data layer.
+func _is_climbable(layer: TileMapLayer, coords: Vector2i) -> bool:
+	var tile_data: TileData = _get_cell_tile_data(layer, coords)
+	if tile_data == null:
+		return false
+	if not tile_data.has_custom_data(&"climbable"):
+		return false
+	return bool(tile_data.get_custom_data(&"climbable"))
 
 
 ## Starts a jump. When jumping while climbing a slope, the horizontal speed is
@@ -382,7 +672,7 @@ func _build_drop_set() -> bool:
 	var scene: Node = get_tree().current_scene
 	if scene == null:
 		return false
-	_collect_tile_map_layers(scene)
+	_collect_tile_map_layers(scene, _drop_layers)
 	if _drop_layers.is_empty():
 		return false
 
@@ -444,11 +734,11 @@ func _build_drop_set() -> bool:
 	return true
 
 
-func _collect_tile_map_layers(node: Node) -> void:
+func _collect_tile_map_layers(node: Node, layers: Array[TileMapLayer]) -> void:
 	if node is TileMapLayer and (node as TileMapLayer).tile_set != null:
-		_drop_layers.append(node as TileMapLayer)
+		layers.append(node as TileMapLayer)
 	for child: Node in node.get_children():
-		_collect_tile_map_layers(child)
+		_collect_tile_map_layers(child, layers)
 
 
 func _add_drop_cell(layer: TileMapLayer, coords: Vector2i, polygons: Array[PackedVector2Array]) -> bool:
@@ -907,6 +1197,7 @@ func take_damage(amount: int, source: Entity = null) -> bool:
 
 ## Applies a knockback impulse away from the source position.
 func apply_knockback(from_position: Vector2) -> void:
+	_stop_climbing()
 	var direction: float = signf(global_position.x - from_position.x)
 	if direction == 0.0:
 		direction = -facing
@@ -964,6 +1255,7 @@ func get_contacts() -> Array[Entity]:
 func die(source: Entity) -> void:
 	if _is_dead:
 		return
+	_stop_climbing()
 	_is_dead = true
 	if hurtbox != null:
 		hurtbox.set_deferred("monitoring", false)

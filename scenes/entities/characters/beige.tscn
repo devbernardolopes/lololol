@@ -11,6 +11,7 @@ height = 52.0
 collision_layer = 2
 script = ExtResource("1_nl5x1")
 playable = true
+can_climb = true
 jump_velocity = -600.0
 hit_points = 3
 can_drop_through = true
