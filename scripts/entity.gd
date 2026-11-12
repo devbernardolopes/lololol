@@ -159,7 +159,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			velocity = _approach_vector(velocity, Vector2.ZERO, delta, deceleration)
 	# --- Jump ---
-	if not flying and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0 or _is_near_floor() or _is_near_stompable()):
+	if not flying and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0):
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		_apply_jump()
