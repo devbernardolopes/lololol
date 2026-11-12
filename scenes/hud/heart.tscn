@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dppnanmb3kwd8"]
+
+[ext_resource type="Script" uid="uid://c1p53c6kdepr0" path="res://scripts/hud/heart.gd" id="1_jhtun"]
+
+[node name="Heart" type="Sprite2D" unique_id=1392527596]
+script = ExtResource("1_jhtun")

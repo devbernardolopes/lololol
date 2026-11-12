@@ -47,11 +47,16 @@ enum Team {
 
 ## When true, this entity may grab tiles marked with the "climbable" custom
 ## data (ladders) by pressing "up" or "down" while overlapping them.
+@export_group("Climbing")
 @export var can_climb: bool = false
 ## Vertical speed while climbing.
 @export var climb_speed: float = 200.0
 ## Playback speed of the climb animation.
 @export var climb_animation_speed: float = 1.0
+## Horizontal reach from a ladder that still allows a grab.
+@export var climb_grab_horizontal_distance: float = 0.0
+## Vertical reach from a ladder that still allows a grab.
+@export var climb_grab_vertical_distance: float = 0.0
 
 @export var team: Team = Team.ENEMY
 @export var contact_damage: int = 0
@@ -77,6 +82,10 @@ const STOMP_GRACE_TIME: float = 0.25
 const CLIMB_GRAB_COOLDOWN: float = 0.25
 ## Safety cap for the number of cells walked while looking for a ladder's end.
 const CLIMB_MAX_SEGMENT: int = 128
+## Ladder tile parts: full cell, top half and bottom half.
+const CLIMB_SECTION_FULL: int = 0
+const CLIMB_SECTION_TOP_HALF: int = 1
+const CLIMB_SECTION_BOTTOM_HALF: int = 2
 ## How far below the collision shape one-way tiles are searched when a drop starts.
 const DROP_SEED_EXPANSION: float = 12.0
 ## Maximum distance between polygon vertices of two tiles for them to be connected.
@@ -416,9 +425,12 @@ func _process_climbing(delta: float, direction: Vector2, up_held: bool, down_hel
 	var feet_before: float = get_body_rect().end.y
 	var feet_target: float = feet_before + float(climb_direction) * climb_speed * delta
 	# The topmost ladder cell is the cap above the landing surface, so climbing
-	# up stops at that cell's bottom edge (the surface the player steps onto).
-	var top_edge: float = _climb_edge_y(_climb_top, 1)
-	var bottom_edge: float = _climb_edge_y(_climb_bottom, 1)
+	# up stops at that cell's climbable bottom edge (the surface the player steps
+	# onto); climbing down stops at the bottom of the segment's climbable part.
+	var top_cell_rect: Rect2 = _climb_cell_rect(_climb_layer, Vector2i(_climb_column, _climb_top), _get_layer_tile_size(_climb_layer))
+	var top_edge: float = top_cell_rect.end.y if _climb_section(_climb_layer, Vector2i(_climb_column, _climb_top)) == CLIMB_SECTION_BOTTOM_HALF else top_cell_rect.position.y
+	var bottom_cell_rect: Rect2 = _climb_cell_rect(_climb_layer, Vector2i(_climb_column, _climb_bottom), _get_layer_tile_size(_climb_layer))
+	var bottom_edge: float = bottom_cell_rect.end.y
 	var reached_end: bool = false
 	if climb_direction < 0 and feet_target <= top_edge:
 		feet_target = top_edge
@@ -509,16 +521,30 @@ func _snap_to_climb_column() -> void:
 	global_position.x = center.x - collision.position.x
 
 
-## Global Y coordinate of the ladder segment's top (-1) or bottom (+1) edge.
-func _climb_edge_y(row: int, direction: int) -> float:
-	if _climb_layer == null:
-		return global_position.y
-	var half_height: float = 0.0
-	if _climb_layer.tile_set != null:
-		half_height = float(_climb_layer.tile_set.tile_size.y) * 0.5
-	var local_center: Vector2 = _climb_layer.map_to_local(Vector2i(_climb_column, row))
-	var local_edge: Vector2 = local_center + Vector2(0.0, half_height * float(direction))
-	return _climb_layer.to_global(local_edge).y
+## The part of a ladder cell that is climbable, expressed as a rect in global
+## space. Custom data sections: 0 = full cell, 1 = top half and 2 = bottom half.
+func _climb_cell_rect(layer: TileMapLayer, coords: Vector2i, tile_size: Vector2) -> Rect2:
+	var center: Vector2 = layer.to_global(layer.map_to_local(coords))
+	var rect := Rect2(center - tile_size * 0.5, tile_size)
+	var section: int = _climb_section(layer, coords)
+	if section == CLIMB_SECTION_TOP_HALF:
+		rect = Rect2(rect.position, Vector2(rect.size.x, tile_size.y * 0.5))
+	elif section == CLIMB_SECTION_BOTTOM_HALF:
+		rect = Rect2(rect.position + Vector2(0.0, tile_size.y * 0.5), Vector2(rect.size.x, tile_size.y * 0.5))
+	return rect
+
+
+## The climbable part of a ladder cell: 0 = full, 1 = top half or 2 = bottom half.
+func _climb_section(layer: TileMapLayer, coords: Vector2i) -> int:
+	var tile_data: TileData = _get_cell_tile_data(layer, coords)
+	if tile_data == null or not tile_data.has_custom_data(&"climb_section"):
+		return CLIMB_SECTION_FULL
+	var value = tile_data.get_custom_data(&"climb_section")
+	if value is int:
+		return int(value)
+	if value is float:
+		return int(roundf(float(value)))
+	return CLIMB_SECTION_FULL
 
 
 ## Plays the climb animation in the movement direction, or pauses it in place.
@@ -550,11 +576,17 @@ func _find_climbable_cell() -> Dictionary:
 	if layers.is_empty():
 		return {}
 	var body_rect: Rect2 = get_body_rect()
+	var grab_rect := body_rect.grow_individual(
+		climb_grab_horizontal_distance,
+		climb_grab_vertical_distance,
+		climb_grab_horizontal_distance,
+		climb_grab_vertical_distance
+	)
 	var best: Dictionary = {}
 	var best_distance: float = INF
 	for layer: TileMapLayer in layers:
-		var top_left: Vector2i = layer.local_to_map(layer.to_local(body_rect.position))
-		var bottom_right: Vector2i = layer.local_to_map(layer.to_local(body_rect.end))
+		var top_left: Vector2i = layer.local_to_map(layer.to_local(grab_rect.position))
+		var bottom_right: Vector2i = layer.local_to_map(layer.to_local(grab_rect.end))
 		for cell_y: int in range(top_left.y - 1, bottom_right.y + 2):
 			for cell_x: int in range(top_left.x - 1, bottom_right.x + 2):
 				var coords := Vector2i(cell_x, cell_y)
@@ -562,10 +594,10 @@ func _find_climbable_cell() -> Dictionary:
 					continue
 				var center: Vector2 = layer.to_global(layer.map_to_local(coords))
 				var tile_size: Vector2 = _get_layer_tile_size(layer)
-				var cell_rect := Rect2(center - tile_size * 0.5, tile_size)
-				if not cell_rect.intersects(body_rect):
+				var cell_rect := _climb_cell_rect(layer, coords, tile_size)
+				if not cell_rect.intersects(grab_rect):
 					continue
-				var distance: float = absf(center.x - body_rect.get_center().x)
+				var distance: float = absf(center.x - grab_rect.get_center().x)
 				if distance >= best_distance:
 					continue
 				var bounds: Vector2i = _climb_segment_bounds(layer, coords)
