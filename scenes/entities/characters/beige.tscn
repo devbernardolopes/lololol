@@ -7,14 +7,18 @@
 radius = 3.0
 height = 52.0
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7tiev"]
+radius = 29.0
+height = 86.0
+
 [node name="Beige" type="CharacterBody2D" unique_id=1720267616]
 collision_layer = 2
 script = ExtResource("1_nl5x1")
 playable = true
-can_climb = true
 jump_velocity = -600.0
 hit_points = 3
 can_drop_through = true
+can_climb = true
 team = 0
 can_stomp = true
 invulnerability_time = 1.0
@@ -26,3 +30,10 @@ position = Vector2(-2, 60)
 rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_m7uww")
 debug_color = Color(0, 0.6, 0.7019608, 0.41960785)
+
+[node name="Hurtbox" type="Area2D" parent="." unique_id=1238978204]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=1128449734]
+position = Vector2(0, 15)
+shape = SubResource("CapsuleShape2D_7tiev")
+debug_color = Color(0.9135915, 0.29276466, 0, 0.41960785)

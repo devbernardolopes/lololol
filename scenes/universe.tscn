@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://ba102dsbhnr7y" path="res://scenes/entities/characters/beige.tscn" id="4_56nod"]
 [ext_resource type="Script" uid="uid://du20g02umhrdf" path="res://scripts/player_controller.gd" id="5_qbb8e"]
 [ext_resource type="PackedScene" uid="uid://c7yv27ygvtmdg" path="res://scenes/entities/enemies/bee.tscn" id="6_56nod"]
+[ext_resource type="PackedScene" uid="uid://iylypctqf2ux" path="res://scenes/hud/hearts_container.tscn" id="8_yb76g"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_m7uww"]
 shader = ExtResource("1_h4s8v")
@@ -48,13 +49,11 @@ position = Vector2(1952, 2328)
 
 [node name="Entities" type="Node2D" parent="." unique_id=1805005763]
 
-[node name="Slime" parent="Entities" unique_id=1101442322 instance=ExtResource("3_qbb8e")]
-position = Vector2(2208, 2144)
-invulnerability_time = 0.0
-
 [node name="Beige" parent="Entities" unique_id=1720267616 instance=ExtResource("4_56nod")]
 position = Vector2(226, 1743)
+max_hit_points = 3
 drop_through_speed = 0.0
+can_climb = false
 
 [node name="PlayerController" type="Node" parent="Entities/Beige" unique_id=2068222258]
 script = ExtResource("5_qbb8e")
@@ -62,6 +61,21 @@ metadata/_custom_type_script = "uid://du20g02umhrdf"
 
 [node name="Bee" parent="Entities" unique_id=1975261106 instance=ExtResource("6_56nod")]
 position = Vector2(1632, 2016)
+
+[node name="Slime2" parent="Entities" unique_id=30518810 instance=ExtResource("3_qbb8e")]
+position = Vector2(560, 1496)
+
+[node name="Slime3" parent="Entities" unique_id=1101442322 instance=ExtResource("3_qbb8e")]
+position = Vector2(728, 1312)
+
+[node name="Slime4" parent="Entities" unique_id=1332930856 instance=ExtResource("3_qbb8e")]
+position = Vector2(640, 1344)
+
+[node name="Slime5" parent="Entities" unique_id=960603797 instance=ExtResource("3_qbb8e")]
+position = Vector2(424, 1432)
+
+[node name="Slime6" parent="Entities" unique_id=1660041127 instance=ExtResource("3_qbb8e")]
+position = Vector2(544, 1272)
 
 [node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=581223513]
 visible = false
@@ -83,9 +97,13 @@ theme_override_constants/margin_bottom = 8
 [node name="HitPoints" type="HBoxContainer" parent="Hud/MarginContainer" unique_id=1937475426]
 layout_mode = 2
 
+[node name="HeartsContainer" parent="Hud" unique_id=881526055 node_paths=PackedStringArray("target") instance=ExtResource("8_yb76g")]
+target = NodePath("../../Entities/Beige")
+
 [node name="Filters" type="CanvasLayer" parent="." unique_id=1374184742]
 
 [node name="LightweightCrt" type="ColorRect" parent="Filters" unique_id=1981363481]
+visible = false
 material = SubResource("ShaderMaterial_m7uww")
 anchors_preset = 15
 anchor_right = 1.0

@@ -7,16 +7,16 @@
 radius = 14.0
 height = 48.0
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_m7uww"]
+radius = 16.0
+height = 48.0
+
 [node name="Slime" type="CharacterBody2D" unique_id=1101442322]
 collision_layer = 2
-collision_mask = 1
 script = ExtResource("1_10iln")
-data = ExtResource("2_5ax0t")
-team = 1
 contact_damage = 1
 stompable = true
-hit_points = 1
-invulnerability_time = 0
+data = ExtResource("2_5ax0t")
 metadata/_custom_type_script = "uid://c7fm6m12fwcih"
 
 [node name="Collision" type="CollisionShape2D" parent="." unique_id=746962958]
@@ -24,3 +24,12 @@ position = Vector2(0, 17)
 rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_tna1j")
 metadata/_edit_lock_ = true
+
+[node name="Hurtbox" type="Area2D" parent="." unique_id=1430770029]
+position = Vector2(0, 16)
+rotation = -1.5707964
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=1709390206]
+position = Vector2(3, 1.1920929e-07)
+shape = SubResource("CapsuleShape2D_m7uww")
+debug_color = Color(0.9925429, 0, 0.25697386, 0.41960785)

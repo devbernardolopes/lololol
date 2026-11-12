@@ -2,5 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c1p53c6kdepr0" path="res://scripts/hud/heart.gd" id="1_jhtun"]
 
-[node name="Heart" type="Sprite2D" unique_id=1392527596]
+[node name="Heart" type="Node2D" unique_id=1813040466]
 script = ExtResource("1_jhtun")
+
+[node name="Visual" type="Sprite2D" parent="." unique_id=1392527596]

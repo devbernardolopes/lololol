@@ -33,18 +33,22 @@ enum Team {
 @export var jump_buffer_time: float = 0.08
 @export_range(0.0, 1.0, 0.05) var slope_jump_assist: float = 0.25
 @export var jump_buffer_distance: float = 24.0
-@export var hit_points: int = 1
-
+@export var hit_points: int = 1:
+	set(v):
+		hit_points = v
+		hit_points_changed.emit()
+@export var max_hit_points: int = 1:
+	set(v):
+		max_hit_points = v
+		max_hit_points_changed.emit()
 @export var flying: bool = false
 @export var hover_amplitude: float = 0.0
 @export var hover_frequency: float = 1.0
-
 ## When true, this entity may drop through terrain tiles by pressing "down"
 ## while jumping from the ground (fall-through).
 @export var can_drop_through: bool = false
 ## Downward fall speed used while dropping through terrain.
 @export var drop_through_speed: float = 450.0
-
 ## When true, this entity may grab tiles marked with the "climbable" custom
 ## data (ladders) by pressing "up" or "down" while overlapping them.
 @export_group("Climbing")
@@ -107,6 +111,8 @@ signal died(source: Entity)
 signal stomped(victim: Entity)
 signal contact_started(other: Entity)
 signal contact_ended(other: Entity)
+signal hit_points_changed()
+signal max_hit_points_changed()
 
 var controller: EntityController = null
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
@@ -1018,6 +1024,7 @@ func _apply_collision_shape_transform() -> void:
 func _sync_hurtbox_transform() -> void:
 	if hurtbox == null or collision == null:
 		return
+	return
 	for child: Node in hurtbox.get_children():
 		if child is CollisionShape2D:
 			(child as CollisionShape2D).transform = collision.transform
@@ -1046,6 +1053,7 @@ func _set_ducking(value: bool) -> void:
 func _sync_hurtbox_shape() -> void:
 	if hurtbox == null:
 		return
+	return
 	for child in hurtbox.get_children():
 		if child is CollisionShape2D:
 			child.shape = collision.shape
@@ -1104,6 +1112,10 @@ func _get_or_create_hurtbox() -> Area2D:
 	for child in get_children():
 		if child is Area2D and child.name == "Hurtbox":
 			hurtbox = child
+			hurtbox.collision_layer = PhysicsLayers.HITBOXES
+			hurtbox.collision_mask = PhysicsLayers.HITBOXES
+			hurtbox.monitoring = true
+			hurtbox.monitorable = true
 			return hurtbox
 	var area: Area2D = Area2D.new()
 	area.collision_layer = PhysicsLayers.HITBOXES

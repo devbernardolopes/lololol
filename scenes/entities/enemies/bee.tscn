@@ -7,6 +7,10 @@
 radius = 14.0
 height = 54.0
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7tiev"]
+radius = 16.0
+height = 48.0
+
 [node name="Bee" type="CharacterBody2D" unique_id=1975261106]
 collision_layer = 2
 script = ExtResource("1_i7mud")
@@ -23,3 +27,11 @@ position = Vector2(0, 10)
 rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_m7uww")
 metadata/_edit_lock_ = true
+
+[node name="Hurtbox" type="Area2D" parent="." unique_id=55866079]
+rotation = -1.5707964
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=1843686557]
+position = Vector2(-8, -3.496911e-07)
+shape = SubResource("CapsuleShape2D_7tiev")
+debug_color = Color(0.9964307, 0, 0.19563645, 0.41960785)
