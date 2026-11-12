@@ -9,6 +9,7 @@ enum State {
 	AIRBORNE,
 	FLY,
 	HIT,
+	DUCK,
 }
 
 enum Team {
@@ -37,6 +38,14 @@ enum Team {
 @export var hover_amplitude: float = 0.0
 @export var hover_frequency: float = 1.0
 
+## When true, this entity may drop through terrain tiles by pressing "down"
+## while jumping from the ground (fall-through).
+@export var can_drop_through: bool = false
+## Horizontal speed used while the entity is ducking.
+@export var duck_speed: float = 200.0
+## Downward fall speed used while dropping through terrain.
+@export var drop_through_speed: float = 450.0
+
 @export var team: Team = Team.ENEMY
 @export var contact_damage: int = 0
 @export var stompable: bool = false
@@ -54,6 +63,7 @@ const ANIMATION_WALK: StringName = &"walk"
 const ANIMATION_JUMP: StringName = &"jump"
 const ANIMATION_FLY: StringName = &"fly"
 const ANIMATION_HIT: StringName = &"hit"
+const ANIMATION_DUCK: StringName = &"duck"
 const STOMP_GRACE_TIME: float = 0.25
 
 signal damaged(amount: int, source: Entity)
@@ -79,6 +89,11 @@ var _hit_stun_timer: float = 0.0
 var _death_linger_timer: float = 0.0
 var _is_dead: bool = false
 var _original_visual_y: float = 0.0
+var _drop_through: bool = false
+var _is_ducking: bool = false
+var _base_collision_shape: Shape2D = null
+var _duck_collision_shape: Shape2D = null
+var _base_collision_mask: int = 1
 
 
 func _ready() -> void:
@@ -94,6 +109,15 @@ func _ready() -> void:
 			controller = _find_controller()
 		if visual != null:
 			_original_visual_y = visual.position.y
+		_base_collision_mask = collision_mask
+		_base_collision_shape = collision.shape
+		if collision.shape is CapsuleShape2D:
+			var base_capsule: CapsuleShape2D = collision.shape as CapsuleShape2D
+			var duck_capsule := CapsuleShape2D.new()
+			duck_capsule.radius = base_capsule.radius * 0.5
+			duck_capsule.height = base_capsule.height * 0.5
+			duck_capsule.height = maxf(duck_capsule.height, duck_capsule.radius * 2.0)
+			_duck_collision_shape = duck_capsule
 		_setup_hurtbox()
 		if team == Team.PLAYER:
 			add_to_group(&"player")
@@ -131,6 +155,8 @@ func _physics_process(delta: float) -> void:
 	var target_speed: float = move_speed
 	if run_active:
 		target_speed = run_speed
+	if _is_ducking:
+		target_speed = duck_speed
 	# --- Jump buffer ---
 	_jump_buffer_timer = maxf(_jump_buffer_timer - delta, 0.0)
 	if controller != null and intents_active and controller.is_jump_just_pressed() and (is_on_floor() or _coyote_timer > 0.0 or _is_near_floor() or _is_near_stompable()):
@@ -159,26 +185,39 @@ func _physics_process(delta: float) -> void:
 		else:
 			velocity = _approach_vector(velocity, Vector2.ZERO, delta, deceleration)
 	# --- Jump ---
-	if not flying and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0):
+	if not flying and not _drop_through and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0):
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		_apply_jump()
 		state = State.AIRBORNE
 		_play_state_animation()
+	if can_drop_through and not flying and controller != null and intents_active and controller.is_jump_just_pressed() and controller.is_down_held() and (was_on_floor or _coyote_timer > 0.0) and not _drop_through:
+		_start_drop_through()
+	if _drop_through and not flying:
+		collision_mask = 0
 	move_and_slide()
 	_process_contacts()
+	if _drop_through and not flying:
+		collision_mask = _base_collision_mask
+		if velocity.y >= 0.0 and test_move(global_transform, Vector2(0.0, jump_buffer_distance)) != null:
+			_drop_through = false
 	# --- State transitions ---
 	if _hit_stun_timer > 0.0:
 		state = State.HIT
 	elif flying:
 		state = State.FLY if direction.x != 0.0 else State.IDLE
 	elif is_on_floor():
-		if direction.x == 0.0:
-			state = State.IDLE
-		elif run_active:
-			state = State.RUN
+		if controller != null and not flying and controller.is_down_held():
+			_set_ducking(true)
+			state = State.DUCK
 		else:
-			state = State.WALK
+			_set_ducking(false)
+			if direction.x == 0.0:
+				state = State.IDLE
+			elif run_active:
+				state = State.RUN
+			else:
+				state = State.WALK
 	else:
 		state = State.AIRBORNE
 	if visual != null and direction.x != 0.0:
@@ -220,6 +259,8 @@ func _play_state_animation() -> void:
 			_play_animation(ANIMATION_WALK, 1.0)
 		State.RUN:
 			_play_animation(ANIMATION_WALK, run_animation_speed)
+		State.DUCK:
+			_play_animation(ANIMATION_DUCK, 1.0)
 		State.AIRBORNE:
 			_play_animation(ANIMATION_JUMP, 1.0)
 		State.FLY:
@@ -241,6 +282,41 @@ func _apply_jump() -> void:
 	velocity.x *= absf(normal.y)
 	var slope_rise: float = velocity.x * normal.x / -normal.y # negative = going up
 	velocity.y += slope_jump_assist * slope_rise
+
+
+## Starts a drop-through: the entity falls through the terrain tile it is
+## standing on instead of landing on it.
+func _start_drop_through() -> void:
+	_drop_through = true
+	_jump_buffer_timer = 0.0
+	_coyote_timer = 0.0
+	velocity.y = drop_through_speed
+	state = State.AIRBORNE
+	_play_state_animation()
+
+
+## Enables or disables the duck hitbox shape.
+func _set_ducking(value: bool) -> void:
+	if _is_ducking == value:
+		return
+	_is_ducking = value
+	if collision == null:
+		return
+	if value:
+		if _duck_collision_shape != null:
+			collision.shape = _duck_collision_shape
+	else:
+		collision.shape = _base_collision_shape
+	_sync_hurtbox_shape()
+
+
+func _sync_hurtbox_shape() -> void:
+	if hurtbox == null:
+		return
+	for child in hurtbox.get_children():
+		if child is CollisionShape2D:
+			child.shape = collision.shape
+			return
 
 
 func _is_near_floor() -> bool:

@@ -27,3 +27,11 @@ func is_jump_held() -> bool:
 
 func is_run_held() -> bool:
 	return Input.is_action_pressed("run")
+
+
+func is_down_held() -> bool:
+	return InputMap.has_action("down") and Input.is_action_pressed("down")
+
+
+func is_up_held() -> bool:
+	return InputMap.has_action("up") and Input.is_action_pressed("up")

@@ -25,3 +25,13 @@ func is_jump_held() -> bool:
 ## Whether the run action is held.
 func is_run_held() -> bool:
 	return false
+
+
+## Whether the vertical "down" input is held (duck / drop-through).
+func is_down_held() -> bool:
+	return false
+
+
+## Whether the vertical "up" input is held (climbing intents).
+func is_up_held() -> bool:
+	return false
