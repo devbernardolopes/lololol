@@ -331,7 +331,9 @@ func _apply_jump() -> void:
 
 
 ## Starts a drop-through: the entity falls through the whole connected one-way
-## surface it is standing on instead of landing on it.
+## surface it is standing on instead of landing on it. Slopes and flat surfaces
+## are dropped through separately, so a ramp never drags the flat ground it
+## connects to into the drop.
 func _start_drop_through() -> void:
 	if not _build_drop_set():
 		return
@@ -360,7 +362,9 @@ func _end_drop_through() -> void:
 
 
 ## Builds the set of one-way tiles that make up the surface being dropped
-## through. Returns false when there is no one-way tile below the entity.
+## through. The flood fill only crosses between tiles of the same kind (marked
+## slopes vs. flat tiles), so a ramp does not absorb the flat ground it connects
+## to. Returns false when there is no one-way tile below the entity.
 func _build_drop_set() -> bool:
 	_drop_layers.clear()
 	_drop_cells.clear()
@@ -406,6 +410,7 @@ func _build_drop_set() -> bool:
 		index += 1
 		var current_layer: TileMapLayer = current["layer"]
 		var current_coords: Vector2i = current["coords"]
+		var current_is_slope: bool = _is_drop_slope(current_layer, current_coords)
 		var world_center: Vector2 = current_layer.to_global(current_layer.map_to_local(current_coords))
 		for layer: TileMapLayer in _drop_layers:
 			var layer_coords: Vector2i = layer.local_to_map(layer.to_local(world_center))
@@ -420,6 +425,10 @@ func _build_drop_set() -> bool:
 					if polygons.is_empty():
 						continue
 					if not _are_drop_polygons_connected(polygons):
+						continue
+					# Flat tiles always end a drop: the floor below a ramp must
+					# catch the entity instead of joining the slope's set.
+					if _is_drop_slope(layer, coords) != current_is_slope:
 						continue
 					if _add_drop_cell(layer, coords, polygons):
 						pending.append({"layer": layer, "coords": coords})
@@ -483,16 +492,7 @@ func _get_cell_drop_polygons(layer: TileMapLayer, coords: Vector2i) -> Array[Pac
 	var flip_h: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_FLIP_H) != 0
 	var flip_v: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_FLIP_V) != 0
 	var transpose: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_TRANSPOSE) != 0
-	var plain_alternative_id: int = alternative_id & TILE_ALTERNATIVE_ID_MASK
-	var source_id: int = layer.get_cell_source_id(coords)
-	if source_id < 0:
-		return result
-	var source: TileSetSource = tile_set.get_source(source_id)
-	if not (source is TileSetAtlasSource):
-		return result
-	var tile_data: TileData = (source as TileSetAtlasSource).get_tile_data(
-		layer.get_cell_atlas_coords(coords), plain_alternative_id
-	)
+	var tile_data: TileData = _get_cell_tile_data(layer, coords)
 	if tile_data == null:
 		return result
 	flip_h = flip_h or tile_data.flip_h
@@ -518,6 +518,35 @@ func _get_cell_drop_polygons(layer: TileMapLayer, coords: Vector2i) -> Array[Pac
 				)
 			result.append(world_points)
 	return result
+
+
+## Whether the tile in a cell is marked as a slope in the tileset's
+## "drop_slope" custom data layer. Unmarked tiles (and tilesets without the
+## layer) count as flat, which always ends a drop.
+func _is_drop_slope(layer: TileMapLayer, coords: Vector2i) -> bool:
+	var tile_data: TileData = _get_cell_tile_data(layer, coords)
+	if tile_data == null:
+		return false
+	if not tile_data.has_custom_data(&"drop_slope"):
+		return false
+	return bool(tile_data.get_custom_data(&"drop_slope"))
+
+
+## TileData backing a cell, or null when the cell uses no atlas tile.
+func _get_cell_tile_data(layer: TileMapLayer, coords: Vector2i) -> TileData:
+	var tile_set: TileSet = layer.tile_set
+	if tile_set == null:
+		return null
+	var source_id: int = layer.get_cell_source_id(coords)
+	if source_id < 0:
+		return null
+	var source: TileSetSource = tile_set.get_source(source_id)
+	if not (source is TileSetAtlasSource):
+		return null
+	var alternative_id: int = layer.get_cell_alternative_tile(coords)
+	return (source as TileSetAtlasSource).get_tile_data(
+		layer.get_cell_atlas_coords(coords), alternative_id & TILE_ALTERNATIVE_ID_MASK
+	)
 
 
 static func _transform_tile_point(point: Vector2, _flip_h: bool, _flip_v: bool, _transpose: bool) -> Vector2:
