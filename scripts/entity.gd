@@ -65,6 +65,18 @@ const ANIMATION_FLY: StringName = &"fly"
 const ANIMATION_HIT: StringName = &"hit"
 const ANIMATION_DUCK: StringName = &"duck"
 const STOMP_GRACE_TIME: float = 0.25
+## How far below the collision shape one-way tiles are searched when a drop starts.
+const DROP_SEED_EXPANSION: float = 12.0
+## Maximum distance between polygon vertices of two tiles for them to be connected.
+const DROP_VERTEX_MERGE_DISTANCE: float = 3.0
+## Safety cap for the number of one-way tiles in a single drop set.
+const DROP_MAX_CELLS: int = 128
+## Safety timeout for a single drop, in seconds.
+const DROP_TIMEOUT: float = 1.0
+## Horizontal margin used when testing whether the entity has cleared the slope.
+const DROP_X_MARGIN: float = 1.0
+## Mask for the plain alternative tile id (the upper bits hold flip/transpose flags).
+const TILE_ALTERNATIVE_ID_MASK: int = 0xFFF
 
 signal damaged(amount: int, source: Entity)
 signal died(source: Entity)
@@ -90,11 +102,18 @@ var _death_linger_timer: float = 0.0
 var _is_dead: bool = false
 var _original_visual_y: float = 0.0
 var _drop_through: bool = false
+var _drop_elapsed: float = 0.0
+var _drop_layers: Array[TileMapLayer] = []
+var _drop_cells: Dictionary = {}
+var _drop_polygons: Array[Dictionary] = []
+var _drop_vertices: PackedVector2Array = PackedVector2Array()
 var _is_ducking: bool = false
 var _base_collision_shape: Shape2D = null
 var _duck_collision_shape: Shape2D = null
 var _duck_collision_shape_position: Vector2 = Vector2.ZERO
 var _base_collision_shape_position: Vector2 = Vector2.ZERO
+var _base_collision_rotation: float = 0.0
+var _collision_mirrored: bool = false
 var _base_collision_mask: int = 1
 
 
@@ -114,6 +133,7 @@ func _ready() -> void:
 		_base_collision_mask = collision_mask
 		_base_collision_shape = collision.shape
 		_base_collision_shape_position = collision.position
+		_base_collision_rotation = collision.rotation
 		if collision.shape is CapsuleShape2D:
 			var base_capsule: CapsuleShape2D = collision.shape as CapsuleShape2D
 			var duck_capsule := CapsuleShape2D.new()
@@ -201,13 +221,13 @@ func _physics_process(delta: float) -> void:
 	if can_drop_through and not flying and controller != null and intents_active and controller.is_jump_just_pressed() and controller.is_down_held() and (was_on_floor or _coyote_timer > 0.0) and not _drop_through:
 		_start_drop_through()
 	if _drop_through and not flying:
+		_update_drop_through(delta)
+	if _drop_through and not flying:
 		collision_mask = 0
 	move_and_slide()
 	_process_contacts()
 	if _drop_through and not flying:
 		collision_mask = _base_collision_mask
-		if velocity.y >= 0.0 and test_move(global_transform, Vector2(0.0, jump_buffer_distance)) != null:
-			_drop_through = false
 	# --- State transitions ---
 	if _hit_stun_timer > 0.0:
 		state = State.HIT
@@ -231,6 +251,7 @@ func _physics_process(delta: float) -> void:
 		visual.flip_h = direction.x < 0.0
 	if direction.x != 0.0:
 		facing = direction.x
+		_update_collision_facing()
 	_play_state_animation()
 
 
@@ -291,15 +312,307 @@ func _apply_jump() -> void:
 	velocity.y += slope_jump_assist * slope_rise
 
 
-## Starts a drop-through: the entity falls through the terrain tile it is
-## standing on instead of landing on it.
+## Starts a drop-through: the entity falls through the whole connected one-way
+## surface it is standing on instead of landing on it.
 func _start_drop_through() -> void:
+	if not _build_drop_set():
+		return
 	_drop_through = true
+	_drop_elapsed = 0.0
 	_jump_buffer_timer = 0.0
 	_coyote_timer = 0.0
 	velocity.y = drop_through_speed
 	state = State.AIRBORNE
 	_play_state_animation()
+
+
+## Ends an active drop-through and restores normal terrain collision.
+func _end_drop_through() -> void:
+	if not _drop_through:
+		return
+	_drop_through = false
+	_drop_elapsed = 0.0
+	_drop_layers.clear()
+	_drop_cells.clear()
+	_drop_polygons.clear()
+	_drop_vertices = PackedVector2Array()
+	collision_mask = _base_collision_mask
+
+
+## Builds the set of one-way tiles that make up the surface being dropped
+## through. Returns false when there is no one-way tile below the entity.
+func _build_drop_set() -> bool:
+	_drop_layers.clear()
+	_drop_cells.clear()
+	_drop_polygons.clear()
+	_drop_vertices = PackedVector2Array()
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return false
+	_collect_tile_map_layers(scene)
+	if _drop_layers.is_empty():
+		return false
+
+	var body_rect: Rect2 = get_body_rect()
+	var seed_rect := Rect2(
+		body_rect.position,
+		body_rect.size + Vector2(0.0, DROP_SEED_EXPANSION)
+	)
+	var pending: Array[Dictionary] = []
+	for layer: TileMapLayer in _drop_layers:
+		for coords: Vector2i in layer.get_used_cells():
+			if _drop_cells.size() >= DROP_MAX_CELLS:
+				break
+			var polygons: Array[PackedVector2Array] = _get_cell_drop_polygons(layer, coords)
+			if polygons.is_empty():
+				continue
+			var touches_body: bool = false
+			for points: PackedVector2Array in polygons:
+				if _points_aabb(points).intersects(seed_rect):
+					touches_body = true
+					break
+			if not touches_body:
+				continue
+			if _add_drop_cell(layer, coords, polygons):
+				pending.append({"layer": layer, "coords": coords})
+
+	if _drop_cells.is_empty():
+		return false
+
+	# Flood fill across the connected surface, possibly over several layers.
+	var index: int = 0
+	while index < pending.size() and _drop_cells.size() < DROP_MAX_CELLS:
+		var current: Dictionary = pending[index]
+		index += 1
+		var current_layer: TileMapLayer = current["layer"]
+		var current_coords: Vector2i = current["coords"]
+		var world_center: Vector2 = current_layer.to_global(current_layer.map_to_local(current_coords))
+		for layer: TileMapLayer in _drop_layers:
+			var layer_coords: Vector2i = layer.local_to_map(layer.to_local(world_center))
+			for offset_x: int in range(-1, 2):
+				for offset_y: int in range(-1, 2):
+					if _drop_cells.size() >= DROP_MAX_CELLS:
+						break
+					var coords: Vector2i = layer_coords + Vector2i(offset_x, offset_y)
+					if _drop_cells.has(_drop_cell_key(layer, coords)):
+						continue
+					var polygons: Array[PackedVector2Array] = _get_cell_drop_polygons(layer, coords)
+					if polygons.is_empty():
+						continue
+					if not _are_drop_polygons_connected(polygons):
+						continue
+					if _add_drop_cell(layer, coords, polygons):
+						pending.append({"layer": layer, "coords": coords})
+	return true
+
+
+func _collect_tile_map_layers(node: Node) -> void:
+	if node is TileMapLayer and (node as TileMapLayer).tile_set != null:
+		_drop_layers.append(node as TileMapLayer)
+	for child: Node in node.get_children():
+		_collect_tile_map_layers(child)
+
+
+func _add_drop_cell(layer: TileMapLayer, coords: Vector2i, polygons: Array[PackedVector2Array]) -> bool:
+	var key: String = _drop_cell_key(layer, coords)
+	if _drop_cells.has(key):
+		return false
+	_drop_cells[key] = true
+	for points: PackedVector2Array in polygons:
+		_drop_polygons.append({"points": points, "aabb": _points_aabb(points)})
+		_drop_vertices.append_array(points)
+	return true
+
+
+static func _points_aabb(points: PackedVector2Array) -> Rect2:
+	if points.is_empty():
+		return Rect2()
+	var min_point: Vector2 = points[0]
+	var max_point: Vector2 = points[0]
+	for point: Vector2 in points:
+		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
+	return Rect2(min_point, max_point - min_point)
+
+
+func _drop_cell_key(layer: TileMapLayer, coords: Vector2i) -> String:
+	return "%d:%d:%d" % [layer.get_instance_id(), coords.x, coords.y]
+
+
+## Whether any vertex of the candidate polygons is close to a vertex already
+## in the drop set. This is what connects flat, 27 and 45 degree slope tiles.
+func _are_drop_polygons_connected(polygons: Array[PackedVector2Array]) -> bool:
+	var max_distance_squared: float = DROP_VERTEX_MERGE_DISTANCE * DROP_VERTEX_MERGE_DISTANCE
+	for points: PackedVector2Array in polygons:
+		for vertex: Vector2 in points:
+			for existing: Vector2 in _drop_vertices:
+				if vertex.distance_squared_to(existing) <= max_distance_squared:
+					return true
+	return false
+
+
+## World-space one-way collision polygons of a tile, with the cell transform
+## flags applied. Empty when the cell has no one-way collision.
+func _get_cell_drop_polygons(layer: TileMapLayer, coords: Vector2i) -> Array[PackedVector2Array]:
+	var result: Array[PackedVector2Array] = []
+	var tile_set: TileSet = layer.tile_set
+	if tile_set == null:
+		return result
+
+	var alternative_id: int = layer.get_cell_alternative_tile(coords)
+	var flip_h: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_FLIP_H) != 0
+	var flip_v: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_FLIP_V) != 0
+	var transpose: bool = (alternative_id & TileSetAtlasSource.TRANSFORM_TRANSPOSE) != 0
+	var plain_alternative_id: int = alternative_id & TILE_ALTERNATIVE_ID_MASK
+	var source_id: int = layer.get_cell_source_id(coords)
+	if source_id < 0:
+		return result
+	var source: TileSetSource = tile_set.get_source(source_id)
+	if not (source is TileSetAtlasSource):
+		return result
+	var tile_data: TileData = (source as TileSetAtlasSource).get_tile_data(
+		layer.get_cell_atlas_coords(coords), plain_alternative_id
+	)
+	if tile_data == null:
+		return result
+	flip_h = flip_h or tile_data.flip_h
+	flip_v = flip_v or tile_data.flip_v
+	transpose = transpose or tile_data.transpose
+
+	var cell_local_origin: Vector2 = layer.map_to_local(coords)
+	for physics_layer: int in range(tile_set.get_physics_layers_count()):
+		var polygon_count: int = tile_data.get_collision_polygons_count(physics_layer)
+		for polygon_index: int in range(polygon_count):
+			if not tile_data.is_collision_polygon_one_way(physics_layer, polygon_index):
+				continue
+			var points: PackedVector2Array = tile_data.get_collision_polygon_points(physics_layer, polygon_index)
+			if points.is_empty():
+				continue
+			var world_points: PackedVector2Array = PackedVector2Array()
+			world_points.resize(points.size())
+			for point_index: int in range(points.size()):
+				world_points[point_index] = layer.to_global(
+					cell_local_origin + _transform_tile_point(
+						points[point_index], flip_h, flip_v, transpose
+					)
+				)
+			result.append(world_points)
+	return result
+
+
+static func _transform_tile_point(point: Vector2, _flip_h: bool, _flip_v: bool, _transpose: bool) -> Vector2:
+	var transformed: Vector2 = point
+	if _transpose:
+		transformed = Vector2(transformed.y, transformed.x)
+	if _flip_h:
+		transformed.x = -transformed.x
+	if _flip_v:
+		transformed.y = -transformed.y
+	return transformed
+
+
+## Advances an active drop. The set is cleared once the entity has passed below
+## its lowest tile, or when the motion test finds a collider that is not part
+## of the drop set (solid ground or an unrelated platform).
+func _update_drop_through(delta: float) -> void:
+	_drop_elapsed += delta
+	if _drop_elapsed >= DROP_TIMEOUT:
+		_end_drop_through()
+		return
+	if _drop_set_is_cleared():
+		_end_drop_through()
+		return
+	if _drop_has_foreign_blocker(delta):
+		_end_drop_through()
+
+
+func _drop_set_is_cleared() -> bool:
+	var body_rect: Rect2 = get_body_rect()
+	var lowest_bottom: float = -INF
+	var has_overlapping_polygon: bool = false
+	for record: Dictionary in _drop_polygons:
+		var aabb: Rect2 = record["aabb"]
+		if aabb.end.x < body_rect.position.x - DROP_X_MARGIN:
+			continue
+		if aabb.position.x > body_rect.end.x + DROP_X_MARGIN:
+			continue
+		has_overlapping_polygon = true
+		lowest_bottom = maxf(lowest_bottom, aabb.end.y)
+	if not has_overlapping_polygon:
+		return true
+	return body_rect.end.y > lowest_bottom
+
+
+func _drop_has_foreign_blocker(delta: float) -> bool:
+	# PhysicsTestMotionParameters2D has no collision mask in Godot 4.7: the
+	# body's own mask is used. It is still _base_collision_mask here because
+	# the drop mask is only zeroed around move_and_slide().
+	var params: PhysicsTestMotionParameters2D = PhysicsTestMotionParameters2D.new()
+	params.recovery_as_collision = true
+	# The 2D motion result only reports the nearest hit, so walk down the
+	# sweep to collect up to 8 obstacles.
+	var motion: Vector2 = Vector2(0.0, maxf(velocity.y * delta, jump_buffer_distance))
+	var from: Transform2D = global_transform
+	for step: int in range(8):
+		params.from = from
+		params.motion = motion
+		var result: PhysicsTestMotionResult2D = PhysicsTestMotionResult2D.new()
+		if not PhysicsServer2D.body_test_motion(get_rid(), params, result):
+			return false
+		var collider: Object = result.get_collider()
+		if not (collider is TileMapLayer):
+			return true
+		var layer: TileMapLayer = collider as TileMapLayer
+		var coords: Vector2i = layer.get_coords_for_body_rid(result.get_collider_rid())
+		if not _drop_cells.has(_drop_cell_key(layer, coords)):
+			return true
+		# Move past the accepted tile to look for anything below it.
+		var travel: Vector2 = result.get_travel()
+		from.origin += travel
+		motion -= travel
+		if motion.length_squared() <= 0.0001:
+			return false
+		var nudge: float = maxf(result.get_collision_depth(), 0.5) + 1.0
+		var nudge_vector: Vector2 = motion.normalized() * nudge
+		from.origin += nudge_vector
+		motion -= nudge_vector
+		if motion.length_squared() <= 0.0001:
+			return false
+	return false
+
+
+## Mirrors the collision shape when the entity faces away from the direction
+## its art was authored in (playable art faces east, enemy art faces west).
+func _update_collision_facing() -> void:
+	var faces_east: bool = facing >= 0.0
+	var should_mirror: bool = faces_east != playable
+	if should_mirror == _collision_mirrored:
+		return
+	_collision_mirrored = should_mirror
+	_apply_collision_shape_transform()
+	_sync_hurtbox_transform()
+
+
+func _apply_collision_shape_transform() -> void:
+	if collision == null:
+		return
+	var use_duck_shape: bool = _is_ducking and _duck_collision_shape != null
+	var shape_position: Vector2 = _duck_collision_shape_position if use_duck_shape else _base_collision_shape_position
+	var shape_rotation: float = _base_collision_rotation
+	if _collision_mirrored:
+		shape_position.x = -shape_position.x
+		shape_rotation = -shape_rotation
+	collision.position = shape_position
+	collision.rotation = shape_rotation
+
+
+func _sync_hurtbox_transform() -> void:
+	if hurtbox == null or collision == null:
+		return
+	for child: Node in hurtbox.get_children():
+		if child is CollisionShape2D:
+			(child as CollisionShape2D).transform = collision.transform
+			return
 
 
 ## Enables or disables the duck hitbox shape.
@@ -313,11 +626,11 @@ func _set_ducking(value: bool) -> void:
 		if _duck_collision_shape != null:
 			collision.debug_color = Color.RED
 			collision.shape = _duck_collision_shape
-			collision.position = _duck_collision_shape_position
+			_apply_collision_shape_transform()
 	else:
 		collision.debug_color = Color(0.0, 0.6, 0.702, 0.42)
 		collision.shape = _base_collision_shape
-		collision.position = _base_collision_shape_position
+		_apply_collision_shape_transform()
 	_sync_hurtbox_shape()
 
 
@@ -539,11 +852,14 @@ func get_body_rect() -> Rect2:
 		return Rect2(Vector2.ZERO, Vector2.ZERO)
 	var shape_rect: Rect2 = collision.shape.get_rect()
 	var half_size: Vector2 = shape_rect.size * 0.5
+	# Use the body transform plus the shape's local transform: collision nodes
+	# with top_level enabled have a global_transform that ignores the body.
+	var shape_transform: Transform2D = global_transform * collision.transform
 	var corners: Array[Vector2] = [
-		collision.global_transform * Vector2(-half_size.x, -half_size.y),
-		collision.global_transform * Vector2(half_size.x, -half_size.y),
-		collision.global_transform * Vector2(-half_size.x, half_size.y),
-		collision.global_transform * Vector2(half_size.x, half_size.y),
+		shape_transform * Vector2(-half_size.x, -half_size.y),
+		shape_transform * Vector2(half_size.x, -half_size.y),
+		shape_transform * Vector2(-half_size.x, half_size.y),
+		shape_transform * Vector2(half_size.x, half_size.y),
 	]
 	var min_corner: Vector2 = corners[0]
 	var max_corner: Vector2 = corners[0]
