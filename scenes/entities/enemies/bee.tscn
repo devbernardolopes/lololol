@@ -9,8 +9,12 @@ height = 54.0
 
 [node name="Bee" type="CharacterBody2D" unique_id=1975261106]
 collision_layer = 2
-collision_mask = 3
 script = ExtResource("1_i7mud")
+flying = true
+hover_amplitude = 4.0
+hover_frequency = 1.5
+contact_damage = 1
+stompable = true
 data = ExtResource("2_rt8cv")
 metadata/_custom_type_script = "uid://c7fm6m12fwcih"
 

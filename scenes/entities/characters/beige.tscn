@@ -9,12 +9,15 @@ height = 80.0
 
 [node name="Beige" type="CharacterBody2D" unique_id=1720267616]
 collision_layer = 2
-collision_mask = 3
+collision_mask = 1
 script = ExtResource("1_nl5x1")
 playable = true
-slope_jump_assist = null
-jump_buffer_distance = null
+jump_velocity = -600.0
 hit_points = 3
+team = 0
+can_stomp = true
+contact_damage = 0
+invulnerability_time = 1.0
 data = ExtResource("2_4gi7c")
 metadata/_custom_type_script = "uid://c4odocttuy1wr"
 

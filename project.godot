@@ -88,6 +88,7 @@ fire={
 2d_physics/layer_1="World"
 2d_physics/layer_2="Entities"
 2d_physics/layer_3="Items"
+2d_physics/layer_4="Hitboxes"
 
 [physics]
 
