@@ -4,5 +4,7 @@
 
 [node name="Entity" type="CharacterBody2D" unique_id=1497594673]
 collision_layer = 2
+floor_constant_speed = true
+floor_snap_length = 16.0
 script = ExtResource("1_iiwub")
 metadata/_custom_type_script = "uid://c4odocttuy1wr"

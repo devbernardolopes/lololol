@@ -19,7 +19,6 @@ func _ready() -> void:
 		visual = AnimatedSprite2D.new()
 		add_child(visual)
 	collision = Helper.find_control(self, "CollisionShape2D", &"Collision")
-	print(collision)
 	if not collision:
 		collision = CollisionShape2D.new()
 		collision.shape = CapsuleShape2D.new()
