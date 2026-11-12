@@ -21,7 +21,6 @@ data = ExtResource("2_4gi7c")
 metadata/_custom_type_script = "uid://c4odocttuy1wr"
 
 [node name="Collision" type="CollisionShape2D" parent="." unique_id=37622642]
-top_level = true
 position = Vector2(-2, 60)
 rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_m7uww")

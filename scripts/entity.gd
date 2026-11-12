@@ -75,6 +75,9 @@ const DROP_MAX_CELLS: int = 128
 const DROP_TIMEOUT: float = 1.0
 ## Horizontal margin used when testing whether the entity has cleared the slope.
 const DROP_X_MARGIN: float = 1.0
+## Maximum distance from a contact point to a drop polygon for the contact to be
+## considered part of the drop set.
+const DROP_CONTACT_TOLERANCE: float = 2.0
 ## Mask for the plain alternative tile id (the upper bits hold flip/transpose flags).
 const TILE_ALTERNATIVE_ID_MASK: int = 0xFFF
 
@@ -102,6 +105,7 @@ var _death_linger_timer: float = 0.0
 var _is_dead: bool = false
 var _original_visual_y: float = 0.0
 var _drop_through: bool = false
+var _drop_moved: bool = false
 var _drop_elapsed: float = 0.0
 var _drop_layers: Array[TileMapLayer] = []
 var _drop_cells: Dictionary = {}
@@ -211,16 +215,29 @@ func _physics_process(delta: float) -> void:
 			velocity = _approach_vector(velocity, direction * target_speed, delta, run_acceleration if run_active else acceleration)
 		else:
 			velocity = _approach_vector(velocity, Vector2.ZERO, delta, deceleration)
-	# --- Jump ---
-	if not flying and not _drop_through and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0):
+	# --- Jump / drop-through ---
+	var drop_requested: bool = (
+		can_drop_through
+		and not flying
+		and intents_active
+		and controller != null
+		and controller.is_jump_just_pressed()
+		and controller.is_down_held()
+		and (was_on_floor or _coyote_timer > 0.0)
+		and not _drop_through
+	)
+	if not flying and not _drop_through and not drop_requested and intents_active and _jump_buffer_timer > 0.0 and (is_on_floor() or _coyote_timer > 0.0):
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		_apply_jump()
 		state = State.AIRBORNE
 		_play_state_animation()
-	if can_drop_through and not flying and controller != null and intents_active and controller.is_jump_just_pressed() and controller.is_down_held() and (was_on_floor or _coyote_timer > 0.0) and not _drop_through:
+	if drop_requested:
 		_start_drop_through()
-	if _drop_through and not flying:
+	# End conditions are skipped on the starting frame: the body is still
+	# resting on the surface, so any test here would cancel the drop before
+	# it has moved through the tile.
+	if _drop_through and not flying and _drop_moved:
 		_update_drop_through(delta)
 	if _drop_through and not flying:
 		collision_mask = 0
@@ -228,6 +245,7 @@ func _physics_process(delta: float) -> void:
 	_process_contacts()
 	if _drop_through and not flying:
 		collision_mask = _base_collision_mask
+		_drop_moved = true
 	# --- State transitions ---
 	if _hit_stun_timer > 0.0:
 		state = State.HIT
@@ -318,6 +336,7 @@ func _start_drop_through() -> void:
 	if not _build_drop_set():
 		return
 	_drop_through = true
+	_drop_moved = false
 	_drop_elapsed = 0.0
 	_jump_buffer_timer = 0.0
 	_coyote_timer = 0.0
@@ -331,6 +350,7 @@ func _end_drop_through() -> void:
 	if not _drop_through:
 		return
 	_drop_through = false
+	_drop_moved = false
 	_drop_elapsed = 0.0
 	_drop_layers.clear()
 	_drop_cells.clear()
@@ -551,7 +571,7 @@ func _drop_has_foreign_blocker(delta: float) -> bool:
 	params.recovery_as_collision = true
 	# The 2D motion result only reports the nearest hit, so walk down the
 	# sweep to collect up to 8 obstacles.
-	var motion: Vector2 = Vector2(0.0, maxf(velocity.y * delta, jump_buffer_distance))
+	var motion: Vector2 = Vector2(0.0, maxf(velocity.y * delta, 1.0))
 	var from: Transform2D = global_transform
 	for step: int in range(8):
 		params.from = from
@@ -562,9 +582,9 @@ func _drop_has_foreign_blocker(delta: float) -> bool:
 		var collider: Object = result.get_collider()
 		if not (collider is TileMapLayer):
 			return true
-		var layer: TileMapLayer = collider as TileMapLayer
-		var coords: Vector2i = layer.get_coords_for_body_rid(result.get_collider_rid())
-		if not _drop_cells.has(_drop_cell_key(layer, coords)):
+		# TileMapLayer merges cells into physics quadrants, so the collider RID
+		# cannot identify the cell that was hit. The contact point can.
+		if not _drop_contains_point(result.get_collision_point()):
 			return true
 		# Move past the accepted tile to look for anything below it.
 		var travel: Vector2 = result.get_travel()
@@ -579,6 +599,35 @@ func _drop_has_foreign_blocker(delta: float) -> bool:
 		if motion.length_squared() <= 0.0001:
 			return false
 	return false
+
+
+## Whether a world-space point lies on one of the one-way collision polygons
+## that make up the active drop set.
+func _drop_contains_point(point: Vector2) -> bool:
+	for record: Dictionary in _drop_polygons:
+		var points: PackedVector2Array = record["points"]
+		if points.is_empty():
+			continue
+		var aabb: Rect2 = record["aabb"]
+		if not aabb.grow(DROP_CONTACT_TOLERANCE).has_point(point):
+			continue
+		if Geometry2D.is_point_in_polygon(point, points):
+			return true
+		for index: int in range(points.size()):
+			var start: Vector2 = points[index]
+			var end: Vector2 = points[(index + 1) % points.size()]
+			if _distance_to_segment(point, start, end) <= DROP_CONTACT_TOLERANCE:
+				return true
+	return false
+
+
+static func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float:
+	var segment: Vector2 = end - start
+	var length_squared: float = segment.length_squared()
+	if length_squared <= 0.0001:
+		return point.distance_to(start)
+	var t: float = clampf((point - start).dot(segment) / length_squared, 0.0, 1.0)
+	return point.distance_to(start + segment * t)
 
 
 ## Mirrors the collision shape when the entity faces away from the direction
