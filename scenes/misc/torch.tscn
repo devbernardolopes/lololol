@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://c2pp8hlgxk1fy"]
+
+[ext_resource type="Script" uid="uid://cekei0wi0j50r" path="res://scripts/misc/torch.gd" id="1_2fv70"]
+[ext_resource type="Texture2D" uid="uid://bqbnk6tcfq3ag" path="res://assets/images/tilesets/spritesheet-tiles-default.png" id="1_mbeaw"]
+[ext_resource type="Texture2D" uid="uid://dfypofnbinwlx" path="res://assets/images/misc/2d_lights_and_shadows_neutral_point_light.webp" id="2_2fv70"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1k402"]
+atlas = ExtResource("1_mbeaw")
+region = Rect2(0, 1105, 64, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_y5utf"]
+atlas = ExtResource("1_mbeaw")
+region = Rect2(130, 1105, 64, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_08qls"]
+atlas = ExtResource("1_mbeaw")
+region = Rect2(65, 1105, 64, 64)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_m7uww"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1k402")
+}],
+"loop": 1,
+"name": &"off",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_y5utf")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_08qls")
+}],
+"loop": 1,
+"name": &"on",
+"speed": 5.0
+}]
+
+[node name="Torch" type="Node2D" unique_id=2131892140]
+script = ExtResource("1_2fv70")
+
+[node name="Visual" type="AnimatedSprite2D" parent="." unique_id=1768565560]
+sprite_frames = SubResource("SpriteFrames_m7uww")
+animation = &"on"
+frame_progress = 0.9089852
+
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=492938942]
+color = Color(1, 0.29411766, 0.16862746, 1)
+texture = ExtResource("2_2fv70")

@@ -331,7 +331,7 @@ func _physics_process(delta: float) -> void:
 		visual.flip_h = direction.x < 0.0
 	if direction.x != 0.0:
 		facing = direction.x
-		_update_collision_facing()
+		#_update_collision_facing()
 	_play_state_animation()
 
 

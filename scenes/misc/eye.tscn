@@ -5,6 +5,8 @@
 
 [node name="Eye" type="Node2D" unique_id=2013263199]
 script = ExtResource("1_cb0vu")
+radius = null
+move_speed = null
 
 [node name="Visual" type="Sprite2D" parent="." unique_id=1966738716]
 texture = ExtResource("1_oewpb")

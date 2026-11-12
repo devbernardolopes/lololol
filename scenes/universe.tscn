@@ -3,7 +3,7 @@
 [ext_resource type="Shader" uid="uid://dgqbbg4eimo4r" path="res://shaders/lightweight_crt.gdshader" id="1_h4s8v"]
 [ext_resource type="TileSet" uid="uid://bnkr34upbjgdx" path="res://resources/tilesets/terrain_tile_set.tres" id="1_yftk6"]
 [ext_resource type="TileSet" uid="uid://qp6pd56kt1q0" path="res://resources/tilesets/decals_tile_set.tres" id="2_jegdv"]
-[ext_resource type="PackedScene" uid="uid://da3b2d16tbctu" path="res://scenes/misc/eye.tscn" id="3_5fwve"]
+[ext_resource type="PackedScene" uid="uid://c2pp8hlgxk1fy" path="res://scenes/misc/torch.tscn" id="3_5fwve"]
 [ext_resource type="PackedScene" uid="uid://dqaq56m04nbh2" path="res://scenes/entities/enemies/slime.tscn" id="3_qbb8e"]
 [ext_resource type="Script" uid="uid://d21238nldet84" path="res://scripts/follow_camera.gd" id="3_xq63u"]
 [ext_resource type="PackedScene" uid="uid://ba102dsbhnr7y" path="res://scenes/entities/characters/beige.tscn" id="4_56nod"]
@@ -38,29 +38,23 @@ tile_set = ExtResource("2_jegdv")
 
 [node name="Eyes" type="Node2D" parent="." unique_id=1230134546]
 
-[node name="Eye" parent="Eyes" unique_id=2013263199 instance=ExtResource("3_5fwve")]
-position = Vector2(148, 1766)
-metadata/_edit_lock_ = true
+[node name="Torches" type="Node2D" parent="." unique_id=1950520610]
 
-[node name="Eye2" parent="Eyes" unique_id=427313255 instance=ExtResource("3_5fwve")]
-position = Vector2(172, 1766)
-metadata/_edit_lock_ = true
+[node name="Torch" parent="Torches" unique_id=2131892140 instance=ExtResource("3_5fwve")]
+position = Vector2(2080, 2080)
+
+[node name="Torch2" parent="Torches" unique_id=672030040 instance=ExtResource("3_5fwve")]
+position = Vector2(1952, 2328)
 
 [node name="Entities" type="Node2D" parent="." unique_id=1805005763]
 
 [node name="Slime" parent="Entities" unique_id=1101442322 instance=ExtResource("3_qbb8e")]
 position = Vector2(2208, 2144)
-can_climb = null
-climb_speed = null
-climb_animation_speed = null
 invulnerability_time = 0.0
 
 [node name="Beige" parent="Entities" unique_id=1720267616 instance=ExtResource("4_56nod")]
-position = Vector2(346, 1692)
+position = Vector2(226, 1743)
 drop_through_speed = 0.0
-can_climb = null
-climb_speed = null
-climb_animation_speed = null
 
 [node name="PlayerController" type="Node" parent="Entities/Beige" unique_id=2068222258]
 script = ExtResource("5_qbb8e")
@@ -68,9 +62,6 @@ metadata/_custom_type_script = "uid://du20g02umhrdf"
 
 [node name="Bee" parent="Entities" unique_id=1975261106 instance=ExtResource("6_56nod")]
 position = Vector2(1632, 2016)
-can_climb = null
-climb_speed = null
-climb_animation_speed = null
 
 [node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=581223513]
 visible = false
@@ -95,7 +86,6 @@ layout_mode = 2
 [node name="Filters" type="CanvasLayer" parent="." unique_id=1374184742]
 
 [node name="LightweightCrt" type="ColorRect" parent="Filters" unique_id=1981363481]
-visible = false
 material = SubResource("ShaderMaterial_m7uww")
 anchors_preset = 15
 anchor_right = 1.0
