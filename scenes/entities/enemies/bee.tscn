@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://c7yv27ygvtmdg"]
+
+[ext_resource type="Script" uid="uid://c7fm6m12fwcih" path="res://scripts/entity.gd" id="1_i7mud"]
+[ext_resource type="Resource" uid="uid://xdc524ro1vwb" path="res://resources/entities/enemies/bee.tres" id="2_rt8cv"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_m7uww"]
+radius = 14.0
+height = 54.0
+
+[node name="Bee" type="CharacterBody2D" unique_id=1975261106]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1_i7mud")
+data = ExtResource("2_rt8cv")
+metadata/_custom_type_script = "uid://c7fm6m12fwcih"
+
+[node name="Collision" type="CollisionShape2D" parent="." unique_id=890931802]
+position = Vector2(0, 10)
+rotation = -1.5707964
+shape = SubResource("CapsuleShape2D_m7uww")
+metadata/_edit_lock_ = true

@@ -25,19 +25,19 @@ func _ready() -> void:
 		(collision.shape as CapsuleShape2D).radius = Helper.BASE_ENTITY_LENGTH_BY_4
 		(collision.shape as CapsuleShape2D).height = Helper.BASE_ENTITY_LENGTH - Helper.BASE_ENTITY_LENGTH_MARGIN
 		add_child(collision)
-	occluder = Helper.find_control(self, "LightOccluder2D")
-	if not occluder:
-		occluder = LightOccluder2D.new()
-		occluder.occluder = OccluderPolygon2D.new()
-		occluder.occluder.polygon = [ 
-				Vector2.ZERO - Vector2.ONE * Helper.BASE_ENTITY_LENGTH_BY_4, 
-				Vector2(Helper.BASE_ENTITY_LENGTH_BY_4, Helper.BASE_ENTITY_LENGTH_BY_4 * -1.0), 
-				Vector2.ONE * Helper.BASE_ENTITY_LENGTH_BY_4, 
-				Vector2(Helper.BASE_ENTITY_LENGTH_BY_4 * -1.0, Helper.BASE_ENTITY_LENGTH_BY_4), 
-				]
-		add_child(occluder)
-	occluder.show_behind_parent = true
-	occluder.occluder.cull_mode = OccluderPolygon2D.CULL_COUNTER_CLOCKWISE
+	#occluder = Helper.find_control(self, "LightOccluder2D")
+	#if not occluder:
+		#occluder = LightOccluder2D.new()
+		#occluder.occluder = OccluderPolygon2D.new()
+		#occluder.occluder.polygon = [ 
+				#Vector2.ZERO - Vector2.ONE * Helper.BASE_ENTITY_LENGTH_BY_4, 
+				#Vector2(Helper.BASE_ENTITY_LENGTH_BY_4, Helper.BASE_ENTITY_LENGTH_BY_4 * -1.0), 
+				#Vector2.ONE * Helper.BASE_ENTITY_LENGTH_BY_4, 
+				#Vector2(Helper.BASE_ENTITY_LENGTH_BY_4 * -1.0, Helper.BASE_ENTITY_LENGTH_BY_4), 
+				#]
+		#add_child(occluder)
+	#occluder.show_behind_parent = true
+	#occluder.occluder.cull_mode = OccluderPolygon2D.CULL_COUNTER_CLOCKWISE
 	_refresh_visual()
 
 

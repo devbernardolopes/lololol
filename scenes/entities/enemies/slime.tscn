@@ -4,15 +4,18 @@
 [ext_resource type="Resource" uid="uid://dfrcbvjg8cu14" path="res://resources/entities/enemies/slime.tres" id="2_5ax0t"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_tna1j"]
-radius = 24.0
+radius = 14.0
 height = 48.0
 
 [node name="Slime" type="CharacterBody2D" unique_id=1101442322]
 collision_layer = 2
+collision_mask = 3
 script = ExtResource("1_10iln")
 data = ExtResource("2_5ax0t")
 metadata/_custom_type_script = "uid://c7fm6m12fwcih"
 
 [node name="Collision" type="CollisionShape2D" parent="." unique_id=746962958]
-position = Vector2(0, 16)
+position = Vector2(0, 17)
+rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_tna1j")
+metadata/_edit_lock_ = true
