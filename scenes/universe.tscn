@@ -3,6 +3,7 @@
 [ext_resource type="Shader" uid="uid://dgqbbg4eimo4r" path="res://shaders/lightweight_crt.gdshader" id="1_h4s8v"]
 [ext_resource type="TileSet" uid="uid://bnkr34upbjgdx" path="res://resources/tilesets/terrain_tile_set.tres" id="1_yftk6"]
 [ext_resource type="TileSet" uid="uid://qp6pd56kt1q0" path="res://resources/tilesets/decals_tile_set.tres" id="2_jegdv"]
+[ext_resource type="PackedScene" uid="uid://da3b2d16tbctu" path="res://scenes/misc/eye.tscn" id="3_5fwve"]
 [ext_resource type="PackedScene" uid="uid://dqaq56m04nbh2" path="res://scenes/entities/enemies/slime.tscn" id="3_qbb8e"]
 [ext_resource type="Script" uid="uid://d21238nldet84" path="res://scripts/follow_camera.gd" id="3_xq63u"]
 [ext_resource type="PackedScene" uid="uid://ba102dsbhnr7y" path="res://scenes/entities/characters/beige.tscn" id="4_56nod"]
@@ -33,8 +34,18 @@ tile_map_data = PackedByteArray("AAAKACQAAAACAAgAAAAKACUAAAARAAcAAAAKACYAAAARAAc
 tile_set = ExtResource("1_yftk6")
 
 [node name="Decals" type="TileMapLayer" parent="." unique_id=301869428]
-tile_map_data = PackedByteArray("AAAUACEAAAAKAAYAAAAUACAAAAAJAAYAAAAWACEAAAALAAYAAAAWACAAAAAKAAYAAAAWAB8AAAAJAAYAAAAVACEAAAAHAAMAAAAeACEAAAAJAAYAAAACABwAAAAKAAMAAAACABsAAAAMAAMAAAAmACEAAAAOAAEAAAAcACEAAAAJAAYAAAAdACEAAAAJAAYAAAA=")
+tile_map_data = PackedByteArray("AAAUACEAAAAKAAYAAAAUACAAAAAJAAYAAAAWACEAAAALAAYAAAAWACAAAAAKAAYAAAAWAB8AAAAJAAYAAAAVACEAAAAHAAMAAAAeACEAAAAJAAYAAAACABwAAAAKAAMAAAACABsAAAAMAAMAAAAmACEAAAAOAAEAAAAcACEAAAAJAAYAAAAdACEAAAAJAAYAAAAkAB4AAAAMAAUAAAAkAB0AAAAMAAUAAAAkABwAAAAMAAUAAAAkABsAAAAMAAUAAAAkABoAAAAMAAUAAAAkABkAAAAMAAUAAAAkABgAAAAMAAUAAAAkABcAAAAMAAUAAAAkABYAAAAMAAUAAAAkABUAAAAMAAUAAAAkABQAAAAMAAUAAAAkABMAAAAMAAUAAAAkABIAAAAMAAUAAAAkABEAAAAMAAUAAAAkABAAAAAMAAUAAAAkAA8AAAAMAAUAAAAkAA4AAAAMAAUAAAAkAA0AAAAMAAUAAAAkAAwAAAANAAUAAAA=")
 tile_set = ExtResource("2_jegdv")
+
+[node name="Eyes" type="Node2D" parent="." unique_id=1230134546]
+
+[node name="Eye" parent="Eyes" unique_id=2013263199 instance=ExtResource("3_5fwve")]
+position = Vector2(148, 1766)
+metadata/_edit_lock_ = true
+
+[node name="Eye2" parent="Eyes" unique_id=427313255 instance=ExtResource("3_5fwve")]
+position = Vector2(172, 1766)
+metadata/_edit_lock_ = true
 
 [node name="Entities" type="Node2D" parent="." unique_id=1805005763]
 

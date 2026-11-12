@@ -41,8 +41,6 @@ enum Team {
 ## When true, this entity may drop through terrain tiles by pressing "down"
 ## while jumping from the ground (fall-through).
 @export var can_drop_through: bool = false
-## Horizontal speed used while the entity is ducking.
-@export var duck_speed: float = 200.0
 ## Downward fall speed used while dropping through terrain.
 @export var drop_through_speed: float = 450.0
 
@@ -183,11 +181,20 @@ func _physics_process(delta: float) -> void:
 		direction = controller.get_move_intent()
 	var was_on_floor: bool = is_on_floor()
 	var run_active: bool = controller != null and controller.is_run_held() and (was_on_floor or flying)
+	# Ducking only changes facing: horizontal input is ignored and any momentum
+	# decelerates to a stop. Use the intent instead of _is_ducking because the
+	# flag is only updated at the end of the frame, and because a stale flag
+	# while airborne must not lock air control.
+	var ducking: bool = (
+		not flying
+		and was_on_floor
+		and intents_active
+		and controller != null
+		and controller.is_down_held()
+	)
 	var target_speed: float = move_speed
 	if run_active:
 		target_speed = run_speed
-	if _is_ducking:
-		target_speed = duck_speed
 	# --- Jump buffer ---
 	_jump_buffer_timer = maxf(_jump_buffer_timer - delta, 0.0)
 	if controller != null and intents_active and controller.is_jump_just_pressed() and (is_on_floor() or _coyote_timer > 0.0 or _is_near_floor() or _is_near_stompable()):
@@ -206,7 +213,9 @@ func _physics_process(delta: float) -> void:
 			velocity.y = 0.0
 	# --- Horizontal movement ---
 	if intents_active and not flying:
-		if direction.x != 0.0:
+		if ducking:
+			velocity.x = _approach(velocity.x, 0.0, delta, deceleration)
+		elif direction.x != 0.0:
 			velocity.x = _approach(velocity.x, direction.x * target_speed, delta, run_acceleration if run_active else acceleration)
 		else:
 			velocity.x = _approach(velocity.x, 0.0, delta, deceleration)

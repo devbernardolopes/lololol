@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://da3b2d16tbctu"]
+
+[ext_resource type="Script" uid="uid://dd5kdyhgl8327" path="res://scripts/misc/eye.gd" id="1_cb0vu"]
+[ext_resource type="Texture2D" uid="uid://bhfrp3k32qltx" path="res://assets/images/misc/tile_0157.png" id="1_oewpb"]
+
+[node name="Eye" type="Node2D" unique_id=2013263199]
+script = ExtResource("1_cb0vu")
+
+[node name="Visual" type="Sprite2D" parent="." unique_id=1966738716]
+texture = ExtResource("1_oewpb")
