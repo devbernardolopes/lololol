@@ -36,10 +36,12 @@ tile_set = ExtResource("2_jegdv")
 [node name="Slime" parent="Entities" unique_id=1101442322 instance=ExtResource("3_qbb8e")]
 position = Vector2(2208, 2144)
 slope_jump_assist = null
+jump_buffer_distance = null
 
 [node name="Beige" parent="Entities" unique_id=1720267616 instance=ExtResource("4_56nod")]
 position = Vector2(288, 1792)
 slope_jump_assist = null
+jump_buffer_distance = null
 
 [node name="PlayerController" type="Node" parent="Entities/Beige" unique_id=2068222258]
 script = ExtResource("5_qbb8e")

@@ -22,6 +22,7 @@ enum State {
 @export var coyote_time: float = 0.12
 @export var jump_buffer_time: float = 0.08
 @export_range(0.0, 1.0, 0.05) var slope_jump_assist: float = 0.25
+@export var jump_buffer_distance: float = 24.0
 @export var hit_points: int = 1
 
 const ANIMATION_IDLE: StringName = &"idle"
@@ -56,8 +57,10 @@ func _physics_process(delta: float) -> void:
 		direction = controller.get_move_intent()
 	var was_on_floor: bool = is_on_floor()
 	# --- Jump buffer ---
+	_jump_buffer_timer = maxf(_jump_buffer_timer - delta, 0.0)
 	if playable and Input.is_action_just_pressed("jump"):
-		_jump_buffer_timer = jump_buffer_time
+		if is_on_floor() or _coyote_timer > 0.0 or _is_near_floor():
+			_jump_buffer_timer = jump_buffer_time
 	# --- Coyote time ---
 	if was_on_floor:
 		_coyote_timer = coyote_time
@@ -145,3 +148,7 @@ func _apply_jump() -> void:
 	velocity.x *= absf(normal.y)
 	var slope_rise: float = velocity.x * normal.x / -normal.y # negative = going up
 	velocity.y += slope_jump_assist * slope_rise
+
+
+func _is_near_floor() -> bool:
+	return velocity.y >= 0.0 and test_move(global_transform, Vector2(0.0, jump_buffer_distance))
