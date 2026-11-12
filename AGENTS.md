@@ -24,6 +24,8 @@ The testing device is:
 - Never reference `EditorInterface` directly from a script that is shipped in a game: editor classes are stripped from export templates and the script then fails to load. Access it only under `Engine.is_editor_hint()` through `Engine.get_singleton(&"EditorInterface")`.
 - Godot generates `.gd.uid` sidecars; keep them tracked so scenes and references stay stable.
 - Avoid local variables or parameters that shadow existing member variables (GDScript warns on shadowing). If a local/parameter name would collide with a member (e.g. a method parameter named `acceleration` when the class has `@export var acceleration`), rename the local/parameter with a `_` prefix (e.g. `_acceleration`).
+- Don't bother reading the contents of `addons` because they're just third-party plug-ins and their code isn't relevant to this development.
+
 
 ## Commit Convention
 
