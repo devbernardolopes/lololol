@@ -4,25 +4,25 @@
 [ext_resource type="Resource" uid="uid://clc6stjf8ff77" path="res://resources/entities/characters/beige.tres" id="2_4gi7c"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_m7uww"]
-radius = 32.0
-height = 80.0
+radius = 3.0
+height = 52.0
 
 [node name="Beige" type="CharacterBody2D" unique_id=1720267616]
 collision_layer = 2
-collision_mask = 1
 script = ExtResource("1_nl5x1")
 playable = true
 jump_velocity = -600.0
-can_drop_through = true
-duck_speed = 200.0
 hit_points = 3
+can_drop_through = true
 team = 0
 can_stomp = true
-contact_damage = 0
 invulnerability_time = 1.0
 data = ExtResource("2_4gi7c")
 metadata/_custom_type_script = "uid://c4odocttuy1wr"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=37622642]
-position = Vector2(0, 24)
+[node name="Collision" type="CollisionShape2D" parent="." unique_id=37622642]
+top_level = true
+position = Vector2(-2, 60)
+rotation = -1.5707964
 shape = SubResource("CapsuleShape2D_m7uww")
+debug_color = Color(0, 0.6, 0.7019608, 0.41960785)

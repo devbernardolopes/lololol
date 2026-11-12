@@ -1,7 +1,7 @@
 [gd_scene format=4 uid="uid://cplmw0ov0h5jw"]
 
 [ext_resource type="Shader" uid="uid://dgqbbg4eimo4r" path="res://shaders/lightweight_crt.gdshader" id="1_h4s8v"]
-[ext_resource type="TileSet" path="res://resources/tilesets/terrain_tile_set.tres" id="1_yftk6"]
+[ext_resource type="TileSet" uid="uid://bnkr34upbjgdx" path="res://resources/tilesets/terrain_tile_set.tres" id="1_yftk6"]
 [ext_resource type="TileSet" uid="uid://qp6pd56kt1q0" path="res://resources/tilesets/decals_tile_set.tres" id="2_jegdv"]
 [ext_resource type="PackedScene" uid="uid://dqaq56m04nbh2" path="res://scenes/entities/enemies/slime.tscn" id="3_qbb8e"]
 [ext_resource type="Script" uid="uid://d21238nldet84" path="res://scripts/follow_camera.gd" id="3_xq63u"]
@@ -40,16 +40,10 @@ tile_set = ExtResource("2_jegdv")
 
 [node name="Slime" parent="Entities" unique_id=1101442322 instance=ExtResource("3_qbb8e")]
 position = Vector2(2208, 2144)
-can_drop_through = null
-duck_speed = null
-drop_through_speed = null
 invulnerability_time = 0.0
 
 [node name="Beige" parent="Entities" unique_id=1720267616 instance=ExtResource("4_56nod")]
-position = Vector2(288, 1792)
-can_drop_through = null
-duck_speed = null
-drop_through_speed = null
+position = Vector2(2208, 384)
 
 [node name="PlayerController" type="Node" parent="Entities/Beige" unique_id=2068222258]
 script = ExtResource("5_qbb8e")
@@ -57,9 +51,6 @@ metadata/_custom_type_script = "uid://du20g02umhrdf"
 
 [node name="Bee" parent="Entities" unique_id=1975261106 instance=ExtResource("6_56nod")]
 position = Vector2(1632, 2016)
-can_drop_through = null
-duck_speed = null
-drop_through_speed = null
 
 [node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=581223513]
 visible = false

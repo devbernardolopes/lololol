@@ -93,6 +93,8 @@ var _drop_through: bool = false
 var _is_ducking: bool = false
 var _base_collision_shape: Shape2D = null
 var _duck_collision_shape: Shape2D = null
+var _duck_collision_shape_position: Vector2 = Vector2.ZERO
+var _base_collision_shape_position: Vector2 = Vector2.ZERO
 var _base_collision_mask: int = 1
 
 
@@ -111,13 +113,18 @@ func _ready() -> void:
 			_original_visual_y = visual.position.y
 		_base_collision_mask = collision_mask
 		_base_collision_shape = collision.shape
+		_base_collision_shape_position = collision.position
 		if collision.shape is CapsuleShape2D:
 			var base_capsule: CapsuleShape2D = collision.shape as CapsuleShape2D
 			var duck_capsule := CapsuleShape2D.new()
-			duck_capsule.radius = base_capsule.radius * 0.5
-			duck_capsule.height = base_capsule.height * 0.5
+			duck_capsule.radius = base_capsule.radius # * 0.5
+			duck_capsule.height = base_capsule.height # * 0.5
 			duck_capsule.height = maxf(duck_capsule.height, duck_capsule.radius * 2.0)
 			_duck_collision_shape = duck_capsule
+			_duck_collision_shape_position = Vector2(
+				collision.position.x,
+				collision.position.y - (base_capsule.height - duck_capsule.height) * 0.5
+			)
 		_setup_hurtbox()
 		if team == Team.PLAYER:
 			add_to_group(&"player")
@@ -304,9 +311,13 @@ func _set_ducking(value: bool) -> void:
 		return
 	if value:
 		if _duck_collision_shape != null:
+			collision.debug_color = Color.RED
 			collision.shape = _duck_collision_shape
+			collision.position = _duck_collision_shape_position
 	else:
+		collision.debug_color = Color(0.0, 0.6, 0.702, 0.42)
 		collision.shape = _base_collision_shape
+		collision.position = _base_collision_shape_position
 	_sync_hurtbox_shape()
 
 
